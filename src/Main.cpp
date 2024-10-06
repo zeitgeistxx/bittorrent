@@ -13,7 +13,7 @@ json decode_bencoded_string(const std::string &encoded_string, size_t &position)
     size_t colon_index = encoded_string.find(':', position);
     if (colon_index != std::string::npos)
     {
-        std::string string_size_str = str.substr(position, colon_index - position);
+        std::string string_size_str = encoded_string.substr(position, colon_index - position);
         int64_t string_size_int = std::atoll(string_size_str.c_str());
         position = colon_index + 1 + string_size_int;
         std::string str = encoded_string.substr(colon_index + 1, string_size_int);
@@ -55,7 +55,7 @@ json decode_bencoded_value(const std::string &encoded_value, size_t &position)
 {
     if (std::isdigit(encoded_value[position]))
     {
-        return decode_bencoded_string(encoded_value, position)
+        return decode_bencoded_string(encoded_value, position);
     }
     else if (encoded_value[position] == 'i')
     {
