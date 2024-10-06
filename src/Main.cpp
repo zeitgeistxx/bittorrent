@@ -8,65 +8,73 @@
 
 using json = nlohmann::json;
 
-json decode_bencoded_value(const std::string &encoded_value)
+json decode_bencoded_string(const std::string &encoded_string, size_t &position)
 {
-    if (std::isdigit(encoded_value[0]))
+    size_t colon_index = encoded_string.find(':', position);
+    if (colon_index != std::string::npos)
     {
-        // Example: "5:hello" -> "hello"
-        size_t colon_index = encoded_value.find(':');
-        if (colon_index != std::string::npos)
-        {
-            std::string number_string = encoded_value.substr(0, colon_index);
-            int64_t number = std::atoll(number_string.c_str());
-            std::string str = encoded_value.substr(colon_index + 1, number);
-            return json(str);
-        }
-        else
-        {
-            throw std::runtime_error("Invalid encoded value: " + encoded_value);
-        }
+        std::string string_size_str = str.substr(position, colon_index - position);
+        int64_t string_size_int = std::atoll(string_size_str.c_str());
+        position = colon_index + 1 + string_size_int;
+        std::string str = encoded_string.substr(colon_index + 1, string_size_int);
+        return json(str);
     }
-    else if (encoded_value[0] == 'i' && encoded_value[encoded_value.length() - 1] == 'e')
+    else
     {
-        // Example: "i52e" -> 52
-        std::string x = encoded_value.substr(1, encoded_value.length() - 2);
-        return json(std::atoll(x.c_str()));
+        throw std::runtime_error("Invalid encoded string: " + encoded_string);
     }
-    else if (encoded_value[0] == 'l' && encoded_value[encoded_value.length() - 1] == 'e')
+}
+
+json decode_bencoded_integer(const std::string &encoded_number, size_t &position)
+{
+    position++;
+    size_t end = encoded_number.find('e', position);
+    if (end == std::string::npos)
     {
-        // Example: "l5:helloi52ee" -> ["hello", 52]
-        json list = json::array();
+        throw std::invalid_argument("Invalid bencoded integer");
+    }
+    std::string integer_str = encoded_number.substr(position, end - position);
+    position = end + 1;
+    return std::stoll(integer_str);
+}
 
-        if (encoded_value.length() <= 2)
-        {
-            return list;
-        }
-        std::string str = encoded_value.substr(1, encoded_value.length() - 2);
-        if (std::isdigit(str[0]))
-        {
-            size_t colon_index = str.find(':');
-            std::string number_string = str.substr(0, colon_index);
-            int64_t number = std::atoll(number_string.c_str());
-            std::string temp_str = str.substr(colon_index + 1, number);
-            list.push_back(temp_str);
+json decode_bencoded_list(const std::string &encoded_list, size_t &position)
+{
+    position++;
+    json list = json::array();
 
-            str = str.substr(colon_index + number + 1, str.length() - 1);
-            if (str[0] == 'i' && str[str.length() - 1] == 'e')
-            {
-                std::string temp_number = str.substr(1, str.length() - 2);
-                list.push_back(std::atoll(temp_number.c_str()));
-            }
-            return list;
-        }
-        else
-        {
-            throw std::runtime_error("Invalid encoded value: " + encoded_value);
-        }
+    while (encoded_list[position] != 'e')
+    {
+        list.push_back(decode_bencoded_value(encoded_list, position));
+    }
+    position++;
+    return list;
+}
+
+json decode_bencoded_value(const std::string &encoded_value, size_t &position)
+{
+    if (std::isdigit(encoded_value[position]))
+    {
+        return decode_bencoded_string(encoded_value, position)
+    }
+    else if (encoded_value[position] == 'i')
+    {
+        return decode_bencoded_integer(encoded_value, position);
+    }
+    else if (encoded_value[position] == 'l')
+    {
+        return decode_bencoded_list(encoded_value, position);
     }
     else
     {
         throw std::runtime_error("Unhandled encoded value: " + encoded_value);
     }
+}
+
+json decode_bencoded_value(const std::string &encoded_value)
+{
+    size_t position = 0;
+    return decode_bencoded_value(encoded_value, position);
 }
 
 int main(int argc, char *argv[])
