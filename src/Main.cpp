@@ -28,8 +28,30 @@ json decode_bencoded_value(const std::string &encoded_value)
     }
     else if (encoded_value[0] == 'i' && encoded_value[encoded_value.length() - 1] == 'e')
     {
+        // Example: "i52e" -> 52
         std::string x = encoded_value.substr(1, encoded_value.length() - 2);
         return json(std::atoll(x.c_str()));
+    }
+    else if (encoded_value[0] == 'l' && encoded_value[encoded_value.length() - 1] == 'e')
+    {
+        // Example: "l5:helloi52ee" -> ["hello", 52]
+        std::string str = encoded_value.substr(1, encoded_value.length() - 2);
+        if (std::isdigit(str[0]))
+        {
+            size_t colon_index = str.find(':');
+            std::string number_string = str.substr(0, colon_index);
+            int64_t number = std::atoll(number_string.c_str());
+            std::string temp_str = str.substr(colon_index + 1, number);
+
+            str = str.substr(colon_index + number + 1, str.length() - 1);
+            std::string temp_number = str.substr(1, str.length() - 2);
+
+            return json(temp_str, std::atoll(temp_number.c_str()));
+        }
+        else
+        {
+            throw std::runtime_error("Invalid encoded value: " + encoded_value);
+        }
     }
     else
     {
