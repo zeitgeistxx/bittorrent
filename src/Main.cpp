@@ -37,6 +37,10 @@ json decode_bencoded_value(const std::string &encoded_value)
         // Example: "l5:helloi52ee" -> ["hello", 52]
         json list = json::array();
 
+        if (encoded_value.length() <= 2)
+        {
+            return list;
+        }
         std::string str = encoded_value.substr(1, encoded_value.length() - 2);
         if (std::isdigit(str[0]))
         {
