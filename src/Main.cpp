@@ -40,21 +40,24 @@ json decode_bencoded_integer(const std::string &encoded_number, size_t &position
 
 json decode_bencoded_list(const std::string &encoded_list, size_t &position)
 {
-    position++;
     json list = json::array();
+    position++;
 
     while (encoded_list[position] != 'e')
     {
-        if (std::isdigit(encoded_list[position]))
+        if (encoded_list[position] == 'l')
+        {
+            list.push_back(decode_bencoded_list(encoded_list, position));
+        }
+        else if (std::isdigit(encoded_list[position]))
         {
             list.push_back(decode_bencoded_string(encoded_list, position));
         }
-        if (encoded_list[position] == 'i')
+        else if (encoded_list[position] == 'i')
         {
             list.push_back(decode_bencoded_integer(encoded_list, position));
         }
     }
-    position++;
     return list;
 }
 
