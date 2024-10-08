@@ -90,7 +90,7 @@ json decode_bencoded_dictionary(const std::string &encoded_dictionary, size_t &p
         {
             value = decode_bencoded_integer(encoded_dictionary, position);
         }
-        else if (encoded_value[position] == 'l')
+        else if (encoded_dictionary[position] == 'l')
         {
             value = decode_bencoded_list(encoded_dictionary, position);
         }
