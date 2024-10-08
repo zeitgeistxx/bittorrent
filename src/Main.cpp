@@ -60,6 +60,7 @@ json decode_bencoded_list(const std::string &encoded_list, size_t &position)
         else if (encoded_list[position] == 'e')
         {
             position++;
+            return list;
         }
     }
     return list;
