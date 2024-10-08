@@ -68,7 +68,7 @@ json decode_bencoded_list(const std::string &encoded_list, size_t &position)
 
 json decode_bencoded_dictionary(const std::string &encoded_dictionary, size_t &position)
 {
-    json dict = {};
+    json dict = json::object();
     std::cout << dict << std::endl;
     position++;
 
