@@ -43,7 +43,7 @@ json decode_bencoded_list(const std::string &encoded_list, size_t &position)
     json list = json::array();
     position++;
 
-    while (encoded_list[position] != 'e')
+    while (position < encoded_list.length())
     {
         if (encoded_list[position] == 'l')
         {
@@ -56,6 +56,10 @@ json decode_bencoded_list(const std::string &encoded_list, size_t &position)
         else if (encoded_list[position] == 'i')
         {
             list.push_back(decode_bencoded_integer(encoded_list, position));
+        }
+        else if (encoded_list[position] == 'e')
+        {
+            position++;
         }
     }
     return list;
