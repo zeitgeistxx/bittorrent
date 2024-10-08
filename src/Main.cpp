@@ -73,14 +73,17 @@ json decode_bencoded_dictionary(const std::string &encoded_dictionary, size_t &p
 
     while (position < encoded_dictionary.length())
     {
-        if (encoded_dictionary[position] == 'e')
+        if (encoded_list[position] == 'd')
+        {
+            dict.push_back(decode_bencoded_dictionary(encoded_dictionary, position));
+        }
+        else if (encoded_dictionary[position] == 'e')
         {
             position++;
             return dict;
         }
 
         std::string key = decode_bencoded_string(encoded_dictionary, position);
-
         json value;
         if (std::isdigit(encoded_dictionary[position]))
         {
