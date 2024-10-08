@@ -45,7 +45,14 @@ json decode_bencoded_list(const std::string &encoded_list, size_t &position)
 
     while (encoded_list[position] != 'e')
     {
-        list.push_back(decode_bencoded_value(encoded_list, position));
+        if (std::isdigit(encoded_list[position]))
+        {
+            list.push_back(decode_bencoded_string(encoded_list, position));
+        }
+        if (encoded_list[position] == 'i')
+        {
+            list.push_back(decode_bencoded_integer(encoded_list, position));
+        }
     }
     position++;
     return list;
@@ -79,7 +86,6 @@ json decode_bencoded_value(const std::string &encoded_value)
 
 int main(int argc, char *argv[])
 {
-    // Flush after every std::cout / std::cerr
     std::cout << std::unitbuf;
     std::cerr << std::unitbuf;
 
