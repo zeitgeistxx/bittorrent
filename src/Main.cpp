@@ -73,7 +73,7 @@ json decode_bencoded_dictionary(const std::string &encoded_dictionary, size_t &p
 
     while (position < encoded_dictionary.length())
     {
-        if (encoded_list[position] == 'd')
+        if (encoded_dictionary[position] == 'd')
         {
             dict.push_back(decode_bencoded_dictionary(encoded_dictionary, position));
         }
