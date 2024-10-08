@@ -80,10 +80,37 @@ json decode_bencoded_value(const std::string &encoded_value, size_t &position)
     {
         return decode_bencoded_list(encoded_value, position);
     }
+    else if (encoded_value[position] == 'd')
+    {
+        return decode_bencoded_dictionary(encoded_value, position);
+    }
     else
     {
         throw std::runtime_error("Unhandled encoded value: " + encoded_value);
     }
+}
+
+json decode_bencoded_dictionary(const std::string &encoded_dictionary, size_t &position)
+{
+    json dict;
+    position++;
+
+    while (position < encoded_dictionary.length())
+    {
+        if (encoded_dictionary[position] == 'e')
+        {
+            position++;
+            return dict;
+        }
+
+        std::string key = decode_bencoded_string(encoded_dictionary, position);
+
+        auto value = decode_bencoded_value(encoded_dictionary, position);
+
+        dict[key] = value;
+    }
+
+    throw std::runtime_error("Invalid dictionary encoding");
 }
 
 json decode_bencoded_value(const std::string &encoded_value)
