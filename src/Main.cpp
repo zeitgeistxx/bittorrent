@@ -153,7 +153,7 @@ std::string calculate_info_hash(const json &info_dict)
             oss << "l";
             for (const auto &item : it.value())
             {
-                oss << item.get<std::string>().length() << ":" item;
+                oss << item.get<std::string>().length() << ":" << item;
             }
             oss << "e";
         }
