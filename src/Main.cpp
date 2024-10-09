@@ -73,32 +73,32 @@ json decode_bencoded_dictionary(const std::string &encoded_dictionary, size_t &p
 
     while (position < encoded_dictionary.length())
     {
-        if (encoded_dictionary[position] == 'd')
-        {
-            dict.push_back(decode_bencoded_dictionary(encoded_dictionary, position));
-        }
-        else if (encoded_dictionary[position] == 'e')
+        if (encoded_dictionary[position] == 'e')
         {
             position++;
             return dict;
         }
 
-        std::string key = decode_bencoded_string(encoded_dictionary, position);
-        json value;
+        json key = decode_bencoded_string(encoded_dictionary, position), value;
         if (std::isdigit(encoded_dictionary[position]))
         {
             value = decode_bencoded_string(encoded_dictionary, position);
+            dict[key] = value;
         }
         else if (encoded_dictionary[position] == 'i')
         {
             value = decode_bencoded_integer(encoded_dictionary, position);
+            dict[key] = value;
         }
         else if (encoded_dictionary[position] == 'l')
         {
             value = decode_bencoded_list(encoded_dictionary, position);
+            dict[key] = value;
         }
-
-        dict[key] = value;
+        else if (encoded_dictionary[position] == 'd')
+        {
+            return decode_bencoded_dictionary(encoded_dictionary, position);
+        }
     }
 
     throw std::runtime_error("Invalid dictionary encoding");
