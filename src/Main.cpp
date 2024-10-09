@@ -3,6 +3,7 @@
 #include <vector>
 #include <cctype>
 #include <cstdlib>
+#include <iostream>
 #include <fstream>
 #include <sstream>
 #include <openssl/sha.h>
@@ -114,6 +115,30 @@ json decode_bencoded_value(const std::string &encoded_value)
     return decode_bencoded_value(encoded_value, position);
 }
 
+std::string decode_pieces(const std::string &pieces_data)
+{
+    if (pieces_data.length() % 20 != 0)
+    {
+        throw std::runtime_error("Invalid pieces data length.");
+    }
+
+    std::ostringstream hashes;
+
+    for (size_t i = 0; i < pieces_data.length(); i += 20)
+    {
+        std::string piece = pieces_data.substr(i, 20);
+
+        unsigned char hash[SHA_DIGEST_LENGTH];
+        SHA1(reinterpret_cast<const unsigned char *>(piece.c_str()), piece.length(), hash);
+
+        for (int j = 0; j < SHA_DIGEST_LENGTH; j++)
+        {
+            hashes << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(hash[j]);
+        }
+    }
+    return hashes.str();
+}
+
 json parse_torrent_file(const std::string &filename)
 {
     std::ifstream ifs(filename);
@@ -126,16 +151,19 @@ json parse_torrent_file(const std::string &filename)
     std::string torrent_data((std::istreambuf_iterator<char>(ifs)),
                              std::istreambuf_iterator<char>());
 
-    return decode_bencoded_value(torrent_data);
+    json decoded_data = decode_bencoded_value(torrent_data);
+    auto pieces_data = decoded_data["info"]["pieces"].get<std::string>();
+
+    decoded_data["info"]["pieces"] = decode_pieces(pieces_data);
+
+    return decoded_data;
 }
 
 std::string calculate_info_hash(const json &info_dict)
 {
-    // info is a dictionary
     std::ostringstream oss;
 
     oss << "d";
-
     for (auto it = info_dict.begin(); it != info_dict.end(); ++it)
     {
         oss << it.key().length() << ":" << it.key();
@@ -161,8 +189,7 @@ std::string calculate_info_hash(const json &info_dict)
     oss << "e";
 
     unsigned char hash[SHA_DIGEST_LENGTH];
-
-    SHA1((unsigned char *)oss.str().c_str(), oss.str().length(), hash);
+    SHA1(reinterpret_cast<const unsigned char *>(oss.str().c_str()), oss.str().length(), hash);
 
     std::ostringstream hex_stream;
 
@@ -207,12 +234,14 @@ int main(int argc, char *argv[])
         }
         std::string filename = argv[2];
         json decoded_data = parse_torrent_file(filename);
+
         std::string tracker_url;
         decoded_data["announce"].get_to(tracker_url);
-        std::string info_hash = calculate_info_hash(decoded_data["info"]);
-
         std::cout << "Tracker URL: " << tracker_url << std::endl;
+
         std::cout << "Length: " << decoded_data["info"]["length"] << std::endl;
+
+        auto info_hash = calculate_info_hash(decoded_data["info"]);
         std::cout << "Info Hash: " << info_hash << std::endl;
     }
     else
