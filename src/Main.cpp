@@ -252,7 +252,7 @@ int main(int argc, char *argv[])
 
         std::cout << "Length: " << decoded_data["info"]["length"] << std::endl;
 
-        auto info_hash = calculate_info_hash(decoded_data["info"]);
+        auto info_hash = calculate_info_hash(decoded_data);
         std::cout << "Info Hash: " << info_hash << std::endl;
     }
     else
