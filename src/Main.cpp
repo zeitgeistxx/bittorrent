@@ -139,27 +139,7 @@ std::string decode_pieces(const std::string &pieces_data)
     return hashes.str();
 }
 
-json parse_torrent_file(const std::string &filename)
-{
-    std::ifstream ifs(filename);
-
-    if (!ifs.is_open())
-    {
-        throw std::runtime_error("Unable to find file: " + filename);
-    }
-
-    std::string torrent_data((std::istreambuf_iterator<char>(ifs)),
-                             std::istreambuf_iterator<char>());
-
-    json decoded_data = decode_bencoded_value(torrent_data);
-    auto pieces_data = decoded_data["info"]["pieces"].get<std::string>();
-
-    decoded_data["info"]["pieces"] = decode_pieces(pieces_data);
-
-    return decoded_data;
-}
-
-std::string calculate_info_hash(const json &info_dict)
+std::string bencode_info_dict(const json &info_dict)
 {
     std::ostringstream oss;
 
@@ -188,8 +168,36 @@ std::string calculate_info_hash(const json &info_dict)
     }
     oss << "e";
 
+    return oss.str();
+}
+
+json parse_torrent_file(const std::string &filename)
+{
+    std::ifstream ifs(filename);
+
+    if (!ifs.is_open())
+    {
+        throw std::runtime_error("Unable to find file: " + filename);
+    }
+
+    std::string torrent_data((std::istreambuf_iterator<char>(ifs)),
+                             std::istreambuf_iterator<char>());
+
+    json decoded_data = decode_bencoded_value(torrent_data);
+    auto pieces_data = decoded_data["info"]["pieces"].get<std::string>();
+
+    decoded_data["info"]["pieces"] = decode_pieces(pieces_data);
+    std::cout << decoded_data << std::endl;
+
+    return decoded_data;
+}
+
+std::string calculate_info_hash(const json &info_dict)
+{
+    auto bencoded_info = bencode_info_dict(info_dict);
+
     unsigned char hash[SHA_DIGEST_LENGTH];
-    SHA1(reinterpret_cast<const unsigned char *>(oss.str().c_str()), oss.str().length(), hash);
+    SHA1(reinterpret_cast<const unsigned char *>(bencoded_info.c_str()), bencoded_info.length(), hash);
 
     std::ostringstream hex_stream;
 
