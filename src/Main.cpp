@@ -165,6 +165,10 @@ std::string bencode_info_dict(const json &info_dict)
             }
             oss << "e";
         }
+        else if (it.value().is_object())
+        {
+            oss << bencode_info_dict(it.value());
+        }
     }
     oss << "e";
 
