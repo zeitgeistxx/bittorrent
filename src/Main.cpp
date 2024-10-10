@@ -187,7 +187,6 @@ json parse_torrent_file(const std::string &filename)
     auto pieces_data = decoded_data["info"]["pieces"].get<std::string>();
 
     decoded_data["info"]["pieces"] = decode_pieces(pieces_data);
-    std::cout << decoded_data << std::endl;
 
     return decoded_data;
 }
