@@ -187,12 +187,12 @@ json parse_torrent_file(const std::string &filename)
     std::string torrent_data((std::istreambuf_iterator<char>(ifs)),
                              std::istreambuf_iterator<char>());
 
-    json decoded_data = decode_bencoded_value(torrent_data);
-    auto pieces_data = decoded_data["info"]["pieces"].get<std::string>();
+    json decoded_torrent = decode_bencoded_value(torrent_data);
+    // auto pieces_data = decoded_torrent["info"]["pieces"].get<std::string>();
 
-    decoded_data["info"]["pieces"] = decode_pieces(pieces_data);
+    // decoded_torrent["info"]["pieces"] = decode_pieces(pieces_data);
 
-    return decoded_data;
+    return decoded_torrent;
 }
 
 std::string calculate_info_hash(const json &info_dict)
@@ -252,7 +252,7 @@ int main(int argc, char *argv[])
 
         std::cout << "Length: " << decoded_data["info"]["length"] << std::endl;
 
-        auto info_hash = calculate_info_hash(decoded_data);
+        auto info_hash = calculate_info_hash(decoded_data["info"]);
         std::cout << "Info Hash: " << info_hash << std::endl;
     }
     else
