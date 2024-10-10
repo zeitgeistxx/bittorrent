@@ -144,30 +144,41 @@ std::string bencode_info_dict(const json &info_dict)
     std::ostringstream oss;
 
     oss << "d";
+
+    // sorted list of keys for lexicographical ordering
+    std::vector<std::string> keys;
     for (auto it = info_dict.begin(); it != info_dict.end(); ++it)
     {
-        oss << it.key().length() << ":" << it.key();
+        keys.push_back(it.key());
+    }
+    std::sort(keys.begin(), keys.end());
 
-        if (it.value().is_string())
+    for (const auto &key : keys)
+    {
+        const auto &value = info_dict[key];
+
+        oss << key.length() << ":" << key;
+
+        if (value.is_string())
         {
-            oss << it.value().get<std::string>().length() << ":" << it.value();
+            oss << value.get<std::string>().length() << ":" << value;
         }
-        else if (it.value().is_number_integer())
+        else if (value.is_number_integer())
         {
-            oss << "i" << it.value().get<int>() << "e";
+            oss << "i" << value.get<int>() << "e";
         }
-        else if (it.value().is_array())
+        else if (value.is_array())
         {
             oss << "l";
-            for (const auto &item : it.value())
+            for (const auto &item : value)
             {
                 oss << item.get<std::string>().length() << ":" << item;
             }
             oss << "e";
         }
-        else if (it.value().is_object())
+        else if (value.is_object())
         {
-            oss << bencode_info_dict(it.value());
+            oss << bencode_info_dict(value);
         }
     }
     oss << "e";
@@ -188,9 +199,9 @@ json parse_torrent_file(const std::string &filename)
                              std::istreambuf_iterator<char>());
 
     json decoded_torrent = decode_bencoded_value(torrent_data);
-    // auto pieces_data = decoded_torrent["info"]["pieces"].get<std::string>();
+    auto pieces_data = decoded_torrent["info"]["pieces"].get<std::string>();
 
-    // decoded_torrent["info"]["pieces"] = decode_pieces(pieces_data);
+    decoded_torrent["info"]["pieces"] = decode_pieces(pieces_data);
 
     return decoded_torrent;
 }
