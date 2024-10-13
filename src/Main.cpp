@@ -1,9 +1,10 @@
 #include <iostream>
+#include <iomanip>
 #include <string>
+#include <cstring>
 #include <vector>
 #include <cctype>
 #include <cstdlib>
-#include <iostream>
 #include <fstream>
 #include <sstream>
 #include <openssl/sha.h>
@@ -15,6 +16,18 @@ using json = nlohmann::json;
 // Function prototypes
 json decode_bencoded_value(const std::string &encoded_value, size_t &position);
 
+bool is_binary_data(const std::string &data)
+{
+    for (char ch : data)
+    {
+        if (!std::isprint(ch) && !std::isspace(ch))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 json decode_bencoded_string(const std::string &encoded_string, size_t &position)
 {
     size_t colon_index = encoded_string.find(':', position);
@@ -22,9 +35,20 @@ json decode_bencoded_string(const std::string &encoded_string, size_t &position)
     {
         std::string string_size_str = encoded_string.substr(position, colon_index - position);
         int64_t string_size_int = std::atoll(string_size_str.c_str());
-        position = colon_index + 1 + string_size_int;
-        std::string str = encoded_string.substr(colon_index + 1, string_size_int);
-        return json(str);
+        position = colon_index + 1;
+        std::string str = encoded_string.substr(position, string_size_int);
+        position += string_size_int;
+
+        // treat it like binary data when applicable
+        if (is_binary_data(str))
+        {
+            std::cout << str << std::endl;
+            return json::binary_t(std::vector<unsigned char>(str.begin(), str.end()));
+        }
+        else
+        {
+            return json(str);
+        }
     }
     else
     {
@@ -85,33 +109,11 @@ json decode_bencoded_dictionary(const std::string &encoded_dictionary, size_t &p
     throw std::runtime_error("Invalid dictionary encoding");
 }
 
-bool is_binary_data(const std::string &data)
-{
-    for (char ch : data)
-    {
-        if (!std::isprint(ch) && !std::isspace(ch))
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
 json decode_bencoded_value(const std::string &encoded_value, size_t &position)
 {
     if (std::isdigit(encoded_value[position]))
     {
-        std::string decoded_string = decode_bencoded_string(encoded_value, position);
-
-        if (is_binary_data(decoded_string))
-        {
-            std::vector<unsigned char> binary_data(decoded_string.begin(), decoded_string.end());
-            return json::binary_t(binary_data);
-        }
-        else
-        {
-            return decoded_string;
-        }
+        return decode_bencoded_string(encoded_value, position);
     }
     else if (encoded_value[position] == 'i')
     {
@@ -140,7 +142,6 @@ json decode_bencoded_value(const std::string &encoded_value)
 std::string bencode_info_dict(const json &info_dict)
 {
     std::ostringstream oss;
-
     oss << "d";
 
     // sorted list of keys for lexicographical ordering
@@ -190,7 +191,22 @@ std::string bencode_info_dict(const json &info_dict)
     return oss.str();
 }
 
-json parse_torrent_file(const std::string &filename)
+std::string calculate_info_hash(const std::string &bencoded_info_dict)
+{
+    unsigned char hash[SHA_DIGEST_LENGTH];
+    SHA1(reinterpret_cast<const unsigned char *>(bencoded_info_dict.c_str()), bencoded_info_dict.length(), hash);
+
+    std::ostringstream hex_stream;
+
+    for (int i = 0; i < SHA_DIGEST_LENGTH; i++)
+    {
+        hex_stream << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(hash[i]);
+    }
+
+    return hex_stream.str();
+}
+
+void parse_torrent_file(const std::string &filename)
 {
     std::ifstream ifs(filename, std::ios::binary);
 
@@ -202,26 +218,19 @@ json parse_torrent_file(const std::string &filename)
     std::string torrent_data((std::istreambuf_iterator<char>(ifs)),
                              std::istreambuf_iterator<char>());
 
-    json decoded_torrent = decode_bencoded_value(torrent_data);
+    ifs.close();
 
-    return decoded_torrent;
-}
+    auto decoded_data = decode_bencoded_value(torrent_data);
 
-std::string calculate_info_hash(const json &info_dict)
-{
-    auto bencoded_info = bencode_info_dict(info_dict);
+    std::string tracker_url;
+    decoded_data["announce"].get_to(tracker_url);
+    std::cout << "Tracker URL: " << tracker_url << std::endl;
 
-    unsigned char hash[SHA_DIGEST_LENGTH];
-    SHA1(reinterpret_cast<const unsigned char *>(bencoded_info.c_str()), bencoded_info.length(), hash);
+    std::cout << "Length: " << decoded_data["info"]["length"] << std::endl;
 
-    std::ostringstream hex_stream;
-
-    for (int i = 0; i < SHA_DIGEST_LENGTH; i++)
-    {
-        hex_stream << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(hash[i]);
-    }
-
-    return hex_stream.str();
+    auto bencoded_info = bencode_info_dict(decoded_data["info"]);
+    auto info_hash = calculate_info_hash(bencoded_info);
+    std::cout << "Info Hash: " << info_hash << std::endl;
 }
 
 int main(int argc, char *argv[])
@@ -256,16 +265,7 @@ int main(int argc, char *argv[])
             return 1;
         }
         std::string filename = argv[2];
-        json decoded_data = parse_torrent_file(filename);
-
-        std::string tracker_url;
-        decoded_data["announce"].get_to(tracker_url);
-        std::cout << "Tracker URL: " << tracker_url << std::endl;
-
-        std::cout << "Length: " << decoded_data["info"]["length"] << std::endl;
-
-        auto info_hash = calculate_info_hash(decoded_data["info"]);
-        std::cout << "Info Hash: " << info_hash << std::endl;
+        parse_torrent_file(filename);
     }
     else
     {
