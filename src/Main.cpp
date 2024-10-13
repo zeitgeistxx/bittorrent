@@ -42,7 +42,6 @@ json decode_bencoded_string(const std::string &encoded_string, size_t &position)
         // treat it like binary data when applicable
         if (is_binary_data(str))
         {
-            std::cout << str << std::endl;
             return json::binary_t(std::vector<unsigned char>(str.begin(), str.end()));
         }
         else
