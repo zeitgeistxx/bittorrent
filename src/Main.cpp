@@ -121,12 +121,8 @@ void peer_handshake(const std::string &filename, const std::string &peer_info)
     int peer_port = std::stoi(peer_info.substr(colon_pos + 1));
 
     const auto peer_id = generatePeerID();
-    auto bencoded_info = bencode_torrent(decoded_data["info"]);
-    SHA1 checksum;
-    checksum.update(bencoded_info);
-    const auto hash = checksum.final();
+    const auto hash = calculate_info_hash(decoded_data["info"]);
     const auto info_hash = hex_to_string(hash);
-    // auto info_hash = url_encode(calculate_info_hash(decoded_data["info"]));
 
     sendHandShake(peer_ip, peer_port, info_hash, peer_id);
 }
