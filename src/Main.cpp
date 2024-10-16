@@ -168,17 +168,29 @@ void parse_torrent(const std::string &filename)
     auto decoded_data = decode_bencoded_value(content);
     auto bencoded_info = bencode_info_dict(decoded_data["info"]);
 
+    std::string tracker_url;
+    decoded_data["announce"].get_to(tracker_url);
+    std::cout << "Tracker URL: " << tracker_url << std::endl;
+    std::cout << "Length: " << decoded_data["info"]["length"] << std::endl;
+
     SHA1 sha1;
     sha1.update(bencoded_info);
     auto info_hash = sha1.final();
     std::cout << "Info Hash: " << info_hash << std::endl;
 
-    std::string tracker_url;
-    decoded_data["announce"].get_to(tracker_url);
-    std::cout << "Tracker URL: " << tracker_url << std::endl;
+    std::cout << "Piece Length: " << decoded_data["info"]["piece length"] << std::endl;
 
-    std::cout << "Length: " << decoded_data["info"]["length"] << std::endl;
-
+    std::cout << "Piece Hashes: " << std::endl;
+    for (size_t i = 0; i < decoded_data["info"]["pieces"].get<std::string>().length(); i += 20)
+    {
+        std::string piece = decoded_data["info"]["pieces"].get<std::string>().substr(i, 20);
+        std::stringstream ss;
+        for (unsigned char byte : piece)
+        {
+            ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte);
+        }
+        std::cout << ss.str() << std::endl;
+    }
 }
 
 int main(int argc, char *argv[])
