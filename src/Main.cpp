@@ -119,7 +119,7 @@ int main(int argc, char *argv[])
 
         auto info_hash = calculate_info_hash(decoded_data["info"]);
 
-        std::string peer_id = "00112233445566778899";
+        std::string peer_id = "bestcapybarabestones";
         int port = 6881;
         int uploaded = 0;
         int downloaded = 0;
