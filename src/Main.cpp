@@ -12,6 +12,25 @@
 #include "lib/tracker.hpp"
 #include "lib/handshake.hpp"
 
+std::string hex_to_string(const std::string &in)
+{
+    std::string output;
+    if ((in.length() % 2) != 0)
+    {
+        throw std::runtime_error("String is not valid length ...");
+    }
+    size_t cnt = in.length() / 2;
+    for (size_t i = 0; cnt > i; ++i)
+    {
+        uint32_t s = 0;
+        std::stringstream ss;
+        ss << std::hex << in.substr(i * 2, 2);
+        ss >> s;
+        output.push_back(static_cast<unsigned char>(s));
+    }
+    return output;
+}
+
 std::string read_file(const std::string &filename)
 {
     std::ifstream file(filename, std::ios::binary);
@@ -102,7 +121,8 @@ void peer_handshake(const std::string &filename, const std::string &peer_info)
     int peer_port = std::stoi(peer_info.substr(colon_pos + 1));
 
     const auto peer_id = generatePeerID();
-    auto info_hash = url_encode(calculate_info_hash(decoded_data["info"]));
+    auto info_hash = calculate_info_hash(decoded_data["info"]);
+    auto hex_info_hash = hex_to_string(info_hash);
 
     sendHandShake(peer_ip, peer_port, info_hash, peer_id);
 }
