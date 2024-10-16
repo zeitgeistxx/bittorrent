@@ -5,13 +5,23 @@
 #include <unistd.h>
 #include <sys/socket.h>
 
+std::string hex_str(const std::string &piece)
+{
+    std::ostringstream ret;
+    for (std::string::size_type i = 0; i < piece.length(); ++i)
+    {
+        ret << std::hex << std::setfill('0') << std::setw(2) << std::nouppercase << (int)(unsigned char)piece[i];
+    }
+    return ret.str();
+}
+
 void sendHandShake(const std::string &peer_ip, int peer_port, const std::string &info_hash, const std::string &peer_id)
 {
-    int sockfd;
+    int client_fd, valread, status;
     struct sockaddr_in server_addr;
+    char buffer[1024] = {0};
 
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0)
+    if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
         perror("Socket creation failed");
         return;
@@ -23,14 +33,14 @@ void sendHandShake(const std::string &peer_ip, int peer_port, const std::string 
     if (inet_pton(AF_INET, peer_ip.c_str(), &server_addr.sin_addr) <= 0)
     {
         perror("Invalid address/ Address not supported");
-        close(sockfd);
+        close(client_fd);
         return;
     }
 
-    if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
+    if ((status = connect(client_fd, (struct sockaddr *)&server_addr, sizeof(server_addr))) < 0)
     {
         perror("Connection failed");
-        close(sockfd);
+        close(client_fd);
         return;
     }
 
@@ -43,22 +53,16 @@ void sendHandShake(const std::string &peer_ip, int peer_port, const std::string 
     message.append(info_hash);
     message.append(peer_id);
 
-    send(sockfd, message.c_str(), message.length(), 0);
+    send(client_fd, message.c_str(), message.length(), 0);
+    valread = read(client_fd, buffer, 70);
 
-    unsigned char response[68];
-    recv(sockfd, response, sizeof(response), 0);
+    std::string response;
+    response.append(buffer, valread);
 
-    close(sockfd);
+    close(client_fd);
 
     std::cout << "Peer ID: ";
-    for (size_t i = 48; i < 68; ++i)
-    {
-        std::cout << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(response[i]);
-        if (i < 67)
-            std::cout << "";
-    }
-
-    std::cout << std::dec << std::endl;
+    std::cout << hex_str(response.substr(48, 20)) << std::endl;
 }
 
 #endif
