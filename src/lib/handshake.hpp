@@ -41,7 +41,7 @@ void sendHandShake(const std::string &peer_ip, int peer_port, const std::string 
     memcpy(handshake + 1, "BitTorrent protocol", 19);
     memset(handshake + 20, 0, 8);
 
-    memcpy(handshake + 28, info_hash.data(), 20);
+    memcpy(handshake + 28, url_encode(info_hash).data(), 20);
     memcpy(handshake + 48, peer_id.data(), 20);
 
     send(sockfd, handshake, sizeof(handshake), 0);
