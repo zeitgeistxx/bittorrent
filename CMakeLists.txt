@@ -4,10 +4,8 @@ project(bittorrent-starter-cpp)
 
 set(CMAKE_CXX_STANDARD 23)
 
-find_package(OpenSSL REQUIRED)
-
 file(GLOB_RECURSE SOURCE_FILES src/*.cpp src/*.hpp)
 
 add_executable(bittorrent ${SOURCE_FILES})
 
-target_link_libraries(bittorrent PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+target_link_libraries(bittorrent PRIVATE)
