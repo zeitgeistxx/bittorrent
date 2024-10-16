@@ -4,7 +4,6 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <sys/socket.h>
-#include <cstring>
 
 void sendHandShake(const std::string &peer_ip, int peer_port, const std::string &info_hash, const std::string &peer_id)
 {
@@ -18,7 +17,6 @@ void sendHandShake(const std::string &peer_ip, int peer_port, const std::string 
         return;
     }
 
-    memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(peer_port);
 
@@ -36,15 +34,16 @@ void sendHandShake(const std::string &peer_ip, int peer_port, const std::string 
         return;
     }
 
-    unsigned char handshake[68] = {0};
-    handshake[0] = 19;
-    memcpy(handshake + 1, "BitTorrent protocol", 19);
-    memset(handshake + 20, 0, 8);
+    std::string message;
+    char c = (char)19;
+    message.push_back(c);
+    message.append("BitTorrent protocol", 19);
+    uint8_t arr[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    message.append((char *)arr, 8);
+    message.append(info_hash);
+    message.append(peer_id);
 
-    memcpy(handshake + 28, info_hash.data(), 20);
-    memcpy(handshake + 48, peer_id.data(), 20);
-
-    send(sockfd, handshake, sizeof(handshake), 0);
+    send(sockfd, message.c_str(), message.length(), 0);
 
     unsigned char response[68];
     recv(sockfd, response, sizeof(response), 0);
