@@ -102,7 +102,7 @@ void peer_handshake(const std::string &filename, const std::string &peer_info)
     int peer_port = std::stoi(peer_info.substr(colon_pos + 1));
 
     const auto peer_id = generatePeerID();
-    auto info_hash = calculate_info_hash(decoded_data["info"]);
+    auto info_hash = url_encode(calculate_info_hash(decoded_data["info"]));
 
     sendHandShake(peer_ip, peer_port, info_hash, peer_id);
 }
