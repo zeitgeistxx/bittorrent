@@ -1,8 +1,6 @@
 #include <iostream>
 #include <iomanip>
 #include <string>
-#include <cstring>
-#include <vector>
 #include <cctype>
 #include <cstdlib>
 #include <fstream>
@@ -12,6 +10,7 @@
 #include "lib/encoder.hpp"
 #include "lib/sha.hpp"
 #include "lib/tracker.hpp"
+#include "lib/handshake.hpp"
 
 std::string read_file(const std::string &filename)
 {
@@ -69,6 +68,45 @@ void parse_torrent(const std::string &filename)
     }
 }
 
+void discover_peers(const std::string &filename)
+{
+    auto content = read_file(filename);
+    auto decoded_data = decode_bencoded_value(content);
+
+    auto tracker_url = decoded_data["announce"].get<std::string>();
+
+    auto info_hash = calculate_info_hash(decoded_data["info"]);
+
+    const auto peer_id = generatePeerID();
+    int port = 6881;
+    int uploaded = 0;
+    int downloaded = 0;
+    int left = decoded_data["info"]["length"];
+
+    request_tracker(tracker_url, info_hash, peer_id, port, uploaded, downloaded, left);
+}
+
+void peer_handshake(const std::string &filename, const std::string &peer_info)
+{
+    auto content = read_file(filename);
+    auto decoded_data = decode_bencoded_value(content);
+
+    size_t colon_pos = peer_info.find(':');
+    if (colon_pos == std::string::npos)
+    {
+        std::cerr << "Invalid peer information format." << std::endl;
+        return;
+    }
+
+    std::string peer_ip = peer_info.substr(0, colon_pos);
+    int peer_port = std::stoi(peer_info.substr(colon_pos + 1));
+
+    const auto peer_id = generatePeerID();
+    auto info_hash = calculate_info_hash(decoded_data["info"]);
+
+    sendHandShake(peer_ip, peer_port, info_hash, peer_id);
+}
+
 int main(int argc, char *argv[])
 {
     std::cout << std::unitbuf;
@@ -97,7 +135,7 @@ int main(int argc, char *argv[])
     {
         if (argc < 3)
         {
-            std::cerr << "Usage: " << argv[0] << " decode <encoded_value>" << std::endl;
+            std::cerr << "Usage: " << argv[0] << " info <torrent_file>" << std::endl;
             return 1;
         }
         std::string filename = argv[2];
@@ -107,25 +145,22 @@ int main(int argc, char *argv[])
     {
         if (argc < 3)
         {
-            std::cerr << "Usage: " << argv[0] << " decode <encoded_value>" << std::endl;
+            std::cerr << "Usage: " << argv[0] << " peers <torrent_file>" << std::endl;
             return 1;
         }
         std::string filename = argv[2];
-        auto content = read_file(filename);
-        auto decoded_data = decode_bencoded_value(content);
-
-        std::string tracker_url;
-        decoded_data["announce"].get_to(tracker_url);
-
-        auto info_hash = calculate_info_hash(decoded_data["info"]);
-
-        std::string peer_id = "bestcapybarabestones";
-        int port = 6881;
-        int uploaded = 0;
-        int downloaded = 0;
-        int left = decoded_data["info"]["length"];
-
-        request_tracker(tracker_url, info_hash, peer_id, port, uploaded, downloaded, left);
+        discover_peers(filename);
+    }
+    else if (command == "handshake")
+    {
+        if (argc < 4)
+        {
+            std::cerr << "Usage: " << argv[0] << " handshake <torrent_file> <peer_ip>:<peer_port>" << std::endl;
+            return 1;
+        }
+        std::string filename = argv[2];
+        std::string peer_info = argv[3];
+        peer_handshake(filename, peer_info);
     }
     else
     {

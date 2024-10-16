@@ -2,6 +2,27 @@
 #define TRACKERS
 
 #include <curl/curl.h>
+#include <random>
+
+std::string generatePeerID()
+{
+    const std::string charset = "abcdefghijklmnopqrstuvwxyz";
+
+    const size_t length = 20;
+    std::string peerID;
+
+    std::random_device rd;
+    std::mt19937 generator(rd());
+
+    std::uniform_int_distribution<size_t> distribution(0, charset.size() - 1);
+
+    for (size_t i = 0; i < length; ++i)
+    {
+        peerID += charset[distribution(generator)];
+    }
+
+    return peerID;
+}
 
 std::string url_encode(const std::string &hex_string)
 {
@@ -46,7 +67,7 @@ void request_tracker(const std::string &tracker_url, const std::string &info_has
     CURLcode res;
     std::string readBuffer;
 
-    // Construct query parameters
+    // query parameters
     std::ostringstream oss;
     oss << tracker_url << "?info_hash=" << url_encode(info_hash)
         << "&peer_id=" << peer_id
