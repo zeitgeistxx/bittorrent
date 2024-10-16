@@ -117,7 +117,8 @@ int main(int argc, char *argv[])
         std::string tracker_url;
         decoded_data["announce"].get_to(tracker_url);
 
-        auto info_hash = calculate_info_hash(decoded_data["info"]);
+        auto info_hash_bytes = calculate_info_hash(decoded_data["info"]);
+        std::string info_hash(info_hash_bytes.begin(), info_hash_bytes.end());
 
         std::string peer_id = "bestcapybarabestones";
         int port = 6881;
