@@ -1,7 +1,7 @@
 #ifndef TORRENT_ENCODER
 #define TORRENT_ENCODER
 
-std::string bencode_info_dict(const json &info_dict)
+std::string bencode_torrent(const json &info_dict)
 {
     std::ostringstream os;
     if (info_dict.is_object())
@@ -9,7 +9,7 @@ std::string bencode_info_dict(const json &info_dict)
         os << 'd';
         for (auto &el : info_dict.items())
         {
-            os << el.key().size() << ':' << el.key() << bencode_info_dict(el.value());
+            os << el.key().size() << ':' << el.key() << bencode_torrent(el.value());
         }
         os << 'e';
     }
@@ -18,7 +18,7 @@ std::string bencode_info_dict(const json &info_dict)
         os << 'l';
         for (const json &item : info_dict)
         {
-            os << bencode_info_dict(item);
+            os << bencode_torrent(item);
         }
         os << 'e';
     }

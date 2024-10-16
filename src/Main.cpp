@@ -30,7 +30,7 @@ std::string read_file(const std::string &filename)
 
 std::string calculate_info_hash(const json &info_dict)
 {
-    auto bencoded_info = bencode_info_dict(info_dict);
+    auto bencoded_info = bencode_torrent(info_dict);
 
     SHA1 sha1;
     sha1.update(bencoded_info);
@@ -117,10 +117,9 @@ int main(int argc, char *argv[])
         std::string tracker_url;
         decoded_data["announce"].get_to(tracker_url);
 
-        auto info_hash_bytes = calculate_info_hash(decoded_data["info"]);
-        std::string info_hash(info_hash_bytes.begin(), info_hash_bytes.end());
+        auto info_hash = calculate_info_hash(decoded_data["info"]);
 
-        std::string peer_id = "bestcapybarabestones";
+        std::string peer_id = "00112233445566778899";
         int port = 6881;
         int uploaded = 0;
         int downloaded = 0;

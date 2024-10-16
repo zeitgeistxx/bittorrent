@@ -3,20 +3,32 @@
 
 #include <curl/curl.h>
 
-std::string url_encode(const std::string &value)
+std::string url_encode(const std::string &hex_string)
 {
-    char buffer[4];
     std::string encoded;
-    for (unsigned char c : value)
+    encoded.reserve(hex_string.length() + hex_string.length() / 2);
+    std::array<bool, 256> unreserved{};
+    for (size_t i = '0'; i <= '9'; ++i)
+        unreserved[i] = true;
+    for (size_t i = 'A'; i <= 'Z'; ++i)
+        unreserved[i] = true;
+    for (size_t i = 'a'; i <= 'z'; ++i)
+        unreserved[i] = true;
+    unreserved['-'] = true;
+    unreserved['_'] = true;
+    unreserved['.'] = true;
+    unreserved['~'] = true;
+    for (size_t i = 0; i < hex_string.length(); i += 2)
     {
-        if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~')
+        std::string byte_str = hex_string.substr(i, 2);
+        int byte_val = std::stoul(byte_str, nullptr, 16);
+        if (unreserved[byte_val])
         {
-            encoded += c;
+            encoded += static_cast<char>(byte_val);
         }
         else
         {
-            snprintf(buffer, sizeof(buffer), "%%%02X", c);
-            encoded += buffer;
+            encoded += "%" + byte_str;
         }
     }
     return encoded;
@@ -37,7 +49,7 @@ void request_tracker(const std::string &tracker_url, const std::string &info_has
     // Construct query parameters
     std::ostringstream oss;
     oss << tracker_url << "?info_hash=" << url_encode(info_hash)
-        << "&peer_id=" << url_encode(peer_id)
+        << "&peer_id=" << peer_id
         << "&port=" << port
         << "&uploaded=" << uploaded
         << "&downloaded=" << downloaded
