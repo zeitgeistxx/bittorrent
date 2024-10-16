@@ -44,14 +44,6 @@ void sendHandShake(const std::string &peer_ip, int peer_port, const std::string 
     memcpy(handshake + 28, info_hash.data(), 20);
     memcpy(handshake + 48, peer_id.data(), 20);
 
-    std::cout << "Handshake in Hexadecimal: ";
-    for (int i = 0; i < 68; ++i)
-    {
-        std::cout << std::hex << std::setw(2) << std::setfill('0')
-                  << static_cast<int>(handshake[i]) << " ";
-    }
-    std::cout << std::dec << std::endl;
-
     send(sockfd, handshake, sizeof(handshake), 0);
 
     unsigned char response[68];
