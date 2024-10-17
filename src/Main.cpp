@@ -63,7 +63,7 @@ std::vector<std::string> discover_peers(const std::string &filename)
     return request_tracker(tracker_url, info_hash, peer_id, port, uploaded, downloaded, left);
 }
 
-std::string peer_handshake(const std::string &filename, const std::string &peer, int &sockfd)
+std::string peer_handshake(const std::string &filename, const std::string &peer, int &sockfd, const std::string peer_id)
 {
     auto content = read_file(filename);
     auto decoded_data = decode_bencoded_value(content);
@@ -72,7 +72,7 @@ std::string peer_handshake(const std::string &filename, const std::string &peer,
     int peer_port;
     split_ip_port(peer, peer_ip, peer_port);
 
-    const auto peer_id = generatePeerID();
+    // const auto peer_id = generatePeerID();
     const auto hash = calculate_info_hash(decoded_data["info"]);
     const auto info_hash = hex_to_string(hash);
 
@@ -86,10 +86,11 @@ void piece_download(const std::string output_file, const std::string &filename, 
     size_t piece_length = decoded_data["info"]["piece length"];
 
     auto peers = discover_peers(filename);
+    const auto peer_id = generatePeerID();
     for (const auto peer : peers)
     {
         int sockfd;
-        peer_handshake(filename, peer, sockfd);
+        peer_handshake(filename, peer, sockfd, peer_id);
 
         if (!download_piece(sockfd, piece_index, piece_length, filename))
         {

@@ -3,7 +3,7 @@
 
 #include <fstream>
 
-ssize_t recv_all(int socket, char *buffer, size_t length)
+ssize_t recv_all(int &socket, char *buffer, size_t length)
 {
     ssize_t total_received = 0;
     while (total_received < length)
@@ -25,7 +25,7 @@ ssize_t recv_all(int socket, char *buffer, size_t length)
     return total_received;
 }
 
-bool receive_peer_message(int client_socket, int &message_id, size_t &payload_length)
+bool receive_peer_message(int &client_socket, int &message_id, size_t &payload_length)
 {
     char header[5] = {0}; // Receive 4 bytes (message length) + 1 byte (message ID)
 
