@@ -99,7 +99,7 @@ std::string read_file(const std::string &filename)
     return buffer.str();
 }
 
-bool write_to_file(const std::string &filename, char *buffer, int &length)
+bool write_to_file(const std::string filename, char *buffer, int length)
 {
     std::ofstream output_file(filename, std::ios::binary);
     if (!output_file)

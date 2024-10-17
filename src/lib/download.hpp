@@ -240,7 +240,7 @@ bool download_piece(int &client_socket, int piece_index, int piece_length, const
             break; // all blocks for this piece have been received
         }
     }
-
+    
     if (!write_to_file(filename, piece_buffer, piece_length))
     {
         delete[] piece_buffer;
