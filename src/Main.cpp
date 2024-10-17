@@ -165,6 +165,7 @@ int main(int argc, char *argv[])
         std::string peer_info = argv[3];
         int sockfd;
         auto peerID = peer_handshake(filename, peer_info, sockfd);
+        close(sockfd);
         std::cout << "Peer ID: " << peerID << std::endl;
     }
     else if (command == "download_piece")
@@ -176,7 +177,7 @@ int main(int argc, char *argv[])
         }
         std::string output_file = argv[3];
         std::string filename = argv[4];
-        int piece_index = std::stoi(argv[5]);
+        int piece_index = std::atoi(argv[5]);
         download_piece(output_file, filename, piece_index);
     }
     else

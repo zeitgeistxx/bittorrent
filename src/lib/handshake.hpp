@@ -56,7 +56,7 @@ std::string sendHandShake(const std::string &peer_ip, int peer_port, const std::
     std::string response;
     response.append(buffer, valread);
 
-    close(client_fd);
+    // close(client_fd);
 
     return hex_str(response.substr(48, 20));
 }
