@@ -15,16 +15,15 @@ std::string hex_str(const std::string &piece)
     return ret.str();
 }
 
-void sendHandShake(const std::string &peer_ip, int peer_port, const std::string &info_hash, const std::string &peer_id)
+std::string sendHandShake(const std::string &peer_ip, int peer_port, const std::string &info_hash, const std::string &peer_id, int &client_fd)
 {
-    int client_fd, valread, status;
+    int valread;
     struct sockaddr_in server_addr;
     char buffer[1024] = {0};
 
     if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
         perror("Socket creation failed");
-        return;
     }
 
     server_addr.sin_family = AF_INET;
@@ -34,14 +33,12 @@ void sendHandShake(const std::string &peer_ip, int peer_port, const std::string 
     {
         perror("Invalid address/ Address not supported");
         close(client_fd);
-        return;
     }
 
-    if ((status = connect(client_fd, (struct sockaddr *)&server_addr, sizeof(server_addr))) < 0)
+    if (connect(client_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
     {
         perror("Connection failed");
         close(client_fd);
-        return;
     }
 
     std::string message;
@@ -61,8 +58,7 @@ void sendHandShake(const std::string &peer_ip, int peer_port, const std::string 
 
     close(client_fd);
 
-    std::cout << "Peer ID: ";
-    std::cout << hex_str(response.substr(48, 20)) << std::endl;
+    return hex_str(response.substr(48, 20));
 }
 
 #endif

@@ -3,6 +3,7 @@
 
 #include <curl/curl.h>
 #include <random>
+#include <vector>
 
 std::string generatePeerID()
 {
@@ -61,7 +62,7 @@ size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp)
     return size * nmemb;
 }
 
-void request_tracker(const std::string &tracker_url, const std::string &info_hash, const std::string &peer_id, int port, int uploaded, int downloaded, int left)
+std::vector<std::string> request_tracker(const std::string &tracker_url, const std::string &info_hash, const std::string &peer_id, int port, int uploaded, int downloaded, int left)
 {
     CURL *curl;
     CURLcode res;
@@ -95,6 +96,8 @@ void request_tracker(const std::string &tracker_url, const std::string &info_has
             if (decoded_response.contains("peers"))
             {
                 const auto &peers = decoded_response["peers"].get<std::string>();
+
+                std::vector<std::string> peers_array;
                 for (size_t i = 0; i < peers.length(); i += 6)
                 {
                     std::string ip = peers.substr(i, 4);                                                            // First 4 bytes are IP
@@ -106,12 +109,16 @@ void request_tracker(const std::string &tracker_url, const std::string &info_has
                               << static_cast<int>(static_cast<unsigned char>(ip[2])) << "."
                               << static_cast<int>(static_cast<unsigned char>(ip[3]));
 
-                    std::cout << "Peer: " << ip_stream.str() << ":" << port << std::endl;
+                    std::ostringstream ip_port;
+                    ip_port << ip_stream.str() << ":" << port;
+                    peers_array.push_back(ip_port.str());
                 }
+                return peers_array;
             }
         }
         curl_easy_cleanup(curl);
     }
+    return {};
 }
 
 #endif

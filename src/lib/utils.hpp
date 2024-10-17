@@ -1,6 +1,8 @@
 #ifndef UTILS
 #define UTILS
 
+#include <fstream>
+
 std::string hex_to_string(const std::string &in)
 {
     std::string output;

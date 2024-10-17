@@ -3,7 +3,6 @@
 #include <string>
 #include <cctype>
 #include <cstdlib>
-#include <fstream>
 #include <sstream>
 
 #include "lib/decoder.hpp"
@@ -12,6 +11,7 @@
 #include "lib/tracker.hpp"
 #include "lib/handshake.hpp"
 #include "lib/utils.hpp"
+#include "lib/download.hpp"
 
 std::string piece_hashes(const std::string &info_piece)
 {
@@ -45,7 +45,7 @@ void parse_torrent(const std::string &filename)
     }
 }
 
-void discover_peers(const std::string &filename)
+std::vector<std::string> discover_peers(const std::string &filename)
 {
     auto content = read_file(filename);
     auto decoded_data = decode_bencoded_value(content);
@@ -60,10 +60,10 @@ void discover_peers(const std::string &filename)
     int downloaded = 0;
     int left = decoded_data["info"]["length"];
 
-    request_tracker(tracker_url, info_hash, peer_id, port, uploaded, downloaded, left);
+    return request_tracker(tracker_url, info_hash, peer_id, port, uploaded, downloaded, left);
 }
 
-void peer_handshake(const std::string &filename, const std::string &peer_info)
+std::string peer_handshake(const std::string &filename, const std::string &peer_info, int &sockfd)
 {
     auto content = read_file(filename);
     auto decoded_data = decode_bencoded_value(content);
@@ -72,7 +72,6 @@ void peer_handshake(const std::string &filename, const std::string &peer_info)
     if (colon_pos == std::string::npos)
     {
         std::cerr << "Invalid peer information format." << std::endl;
-        return;
     }
 
     std::string peer_ip = peer_info.substr(0, colon_pos);
@@ -82,7 +81,29 @@ void peer_handshake(const std::string &filename, const std::string &peer_info)
     const auto hash = calculate_info_hash(decoded_data["info"]);
     const auto info_hash = hex_to_string(hash);
 
-    sendHandShake(peer_ip, peer_port, info_hash, peer_id);
+    return sendHandShake(peer_ip, peer_port, info_hash, peer_id, sockfd);
+}
+
+void download_piece(const std::string output_file, const std::string &filename, int piece_index)
+{
+    auto content = read_file(filename);
+    auto decoded_data = decode_bencoded_value(content);
+    size_t piece_length = decoded_data["info"]["piece length"];
+
+    auto peers = discover_peers(filename);
+    for (const auto peer : peers)
+    {
+        int sockfd;
+        peer_handshake(filename, peer, sockfd);
+
+        sendInterested(sockfd);
+        waitForUnchoke(sockfd);
+
+        requestPiece(sockfd, piece_index, piece_length);
+        receivePiece(sockfd, output_file, piece_index, piece_length);
+
+        close(sockfd);
+    }
 }
 
 int main(int argc, char *argv[])
@@ -127,7 +148,11 @@ int main(int argc, char *argv[])
             return 1;
         }
         std::string filename = argv[2];
-        discover_peers(filename);
+        auto peers = discover_peers(filename);
+        for (const auto &peer : peers)
+        {
+            std::cout << "Peer: " << peer << std::endl;
+        }
     }
     else if (command == "handshake")
     {
@@ -138,7 +163,21 @@ int main(int argc, char *argv[])
         }
         std::string filename = argv[2];
         std::string peer_info = argv[3];
-        peer_handshake(filename, peer_info);
+        int sockfd;
+        auto peerID = peer_handshake(filename, peer_info, sockfd);
+        std::cout << "Peer ID: " << peerID << std::endl;
+    }
+    else if (command == "download_piece")
+    {
+        if (argc < 5)
+        {
+            std::cerr << "Usage: " << argv[0] << " download_piece -o /tmp/<filename> <torrent_file> 0" << std::endl;
+            return 1;
+        }
+        std::string output_file = argv[2];
+        std::string filename = argv[3];
+        int piece_index = std::stoi(argv[4]);
+        download_piece(output_file, filename, piece_index);
     }
     else
     {
