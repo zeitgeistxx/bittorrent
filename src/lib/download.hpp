@@ -240,12 +240,23 @@ bool download_piece(int &client_socket, int piece_index, int piece_length, const
             break; // all blocks for this piece have been received
         }
     }
-    
-    if (!write_to_file(filename, piece_buffer, piece_length))
+
+    // if (!write_to_file(filename, piece_buffer, piece_length))
+    // {
+    //     delete[] piece_buffer;
+    //     return false;
+    // }
+
+    std::ofstream output_file(filename, std::ios::binary);
+    if (!output_file)
     {
+        std::cerr << "Failed to open output file." << std::endl;
         delete[] piece_buffer;
         return false;
     }
+
+    output_file.write(piece_buffer, piece_length);
+    output_file.close();
 
     delete[] piece_buffer;
     return true;
