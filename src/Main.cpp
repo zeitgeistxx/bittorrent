@@ -63,19 +63,14 @@ std::vector<std::string> discover_peers(const std::string &filename)
     return request_tracker(tracker_url, info_hash, peer_id, port, uploaded, downloaded, left);
 }
 
-std::string peer_handshake(const std::string &filename, const std::string &peer_info, int &sockfd)
+std::string peer_handshake(const std::string &filename, const std::string &peer, int &sockfd)
 {
     auto content = read_file(filename);
     auto decoded_data = decode_bencoded_value(content);
 
-    size_t colon_pos = peer_info.find(':');
-    if (colon_pos == std::string::npos)
-    {
-        std::cerr << "Invalid peer information format." << std::endl;
-    }
-
-    std::string peer_ip = peer_info.substr(0, colon_pos);
-    int peer_port = std::stoi(peer_info.substr(colon_pos + 1));
+    std::string peer_ip;
+    int peer_port;
+    split_ip_port(peer, peer_ip, peer_port);
 
     const auto peer_id = generatePeerID();
     const auto hash = calculate_info_hash(decoded_data["info"]);
@@ -84,7 +79,7 @@ std::string peer_handshake(const std::string &filename, const std::string &peer_
     return sendHandShake(peer_ip, peer_port, info_hash, peer_id, sockfd);
 }
 
-void download_piece(const std::string output_file, const std::string &filename, int piece_index)
+void piece_download(const std::string output_file, const std::string &filename, int piece_index)
 {
     auto content = read_file(filename);
     auto decoded_data = decode_bencoded_value(content);
@@ -94,15 +89,13 @@ void download_piece(const std::string output_file, const std::string &filename, 
     for (const auto peer : peers)
     {
         int sockfd;
-        std::cout << peer_handshake(filename, peer, sockfd) << std::endl;
+        peer_handshake(filename, peer, sockfd);
 
-        sendInterested(sockfd);
-        waitForUnchoke(sockfd);
-
-        requestPiece(sockfd, piece_index, piece_length);
-        receivePiece(sockfd, output_file, piece_index, piece_length);
-
-        close(sockfd);
+        if (!download_piece(sockfd, piece_index, piece_length, filename))
+        {
+            close(sockfd);
+            return;
+        }
     }
 }
 
@@ -178,7 +171,7 @@ int main(int argc, char *argv[])
         std::string output_file = argv[3];
         std::string filename = argv[4];
         int piece_index = std::atoi(argv[5]);
-        download_piece(output_file, filename, piece_index);
+        piece_download(output_file, filename, piece_index);
     }
     else
     {

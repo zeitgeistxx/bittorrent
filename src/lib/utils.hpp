@@ -3,6 +3,57 @@
 
 #include <fstream>
 
+ssize_t recv_all(int socket, char *buffer, size_t length)
+{
+    ssize_t total_received = 0;
+    while (total_received < length)
+    {
+        ssize_t bytes_received = recv(socket, buffer + total_received, length - total_received, 0);
+        if (bytes_received < 0)
+        {
+            perror("recv");
+            std::cerr << "Failed after receiving " << total_received << " bytes." << std::endl;
+            return -1;
+        }
+        else if (bytes_received == 0)
+        {
+            std::cerr << "Connection closed after receiving " << total_received << " bytes." << std::endl;
+            break; // Connection closed
+        }
+        total_received += bytes_received;
+    }
+    return total_received;
+}
+
+bool receive_peer_message(int client_socket, int &message_id, size_t &payload_length)
+{
+    char header[5] = {0}; // Receive 4 bytes (message length) + 1 byte (message ID)
+
+    ssize_t bytes_received = recv_all(client_socket, header, sizeof(header));
+    if (bytes_received != sizeof(header))
+    {
+        std::cerr << "Failed to receive peer message header." << std::endl;
+        return false;
+    }
+
+    uint32_t length = ntohl(*(uint32_t *)header);       // Convert network byte order to host byte order
+    message_id = static_cast<unsigned char>(header[4]); // 5th byte is the message ID
+    payload_length = length - 1;
+    return true;
+}
+
+void split_ip_port(const std::string &peer, std::string &ip, int &port)
+{
+    size_t colon_pos = peer.find(':');
+    if (colon_pos == std::string::npos)
+    {
+        std::cerr << "Invalid peer information format." << std::endl;
+    }
+
+    ip = peer.substr(0, colon_pos);
+    port = std::stoi(peer.substr(colon_pos + 1));
+}
+
 std::string hex_to_string(const std::string &in)
 {
     std::string output;
@@ -44,6 +95,21 @@ std::string read_file(const std::string &filename)
     buffer << file.rdbuf();
     file.close();
     return buffer.str();
+}
+
+bool write_to_file(const std::string &filename, char *buffer, int &length)
+{
+    std::ofstream output_file(filename, std::ios::binary);
+    if (!output_file)
+    {
+        std::cerr << "Failed to open output file." << std::endl;
+        return false;
+    }
+
+    output_file.write(buffer, length);
+    output_file.close();
+
+    return true;
 }
 
 #endif

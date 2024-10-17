@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <sys/socket.h>
 
-std::string hex_str(const std::string &piece)
+std::string peerid_to_hex_str(const std::string &piece)
 {
     std::ostringstream ret;
     for (std::string::size_type i = 0; i < piece.length(); ++i)
@@ -56,9 +56,7 @@ std::string sendHandShake(const std::string &peer_ip, int peer_port, const std::
     std::string response;
     response.append(buffer, valread);
 
-    // close(client_fd);
-
-    return hex_str(response.substr(48, 20));
+    return peerid_to_hex_str(response.substr(48, 20));
 }
 
 #endif
