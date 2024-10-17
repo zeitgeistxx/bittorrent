@@ -14,7 +14,7 @@ ssize_t recv_all(int &sockfd, char *buffer, size_t length)
         {
             perror("recv");
             std::cerr << "Failed after receiving " << total_received << " bytes." << std::endl;
-            return -1;
+            return 0;
         }
         else if (bytes_received == 0)
         {
