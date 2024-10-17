@@ -90,7 +90,7 @@ void piece_download(const std::string output_file, const std::string &filename, 
     int sockfd;
     peer_handshake(filename, peers[0], sockfd);
 
-    if (!download_piece(sockfd, piece_index, piece_length, filename))
+    if (!download_piece(sockfd, piece_index, piece_length, output_file))
     {
         close(sockfd);
         return;

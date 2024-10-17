@@ -191,7 +191,7 @@ bool receivePiece(int &sockfd, char *piece_buffer, int piece_index, int block_of
     return true;
 }
 
-bool download_piece(int &client_socket, int piece_index, int piece_length, const std::string &filename)
+bool download_piece(int &client_socket, int piece_index, int piece_length, const std::string &output_filename)
 {
     if (!waitForBitField(client_socket))
     {
@@ -207,8 +207,6 @@ bool download_piece(int &client_socket, int piece_index, int piece_length, const
     {
         return false;
     }
-
-    std::cout << filename << std::endl;
 
     const int BLOCK_SIZE = 16 * 1024; // break piece into blocks of 16 KiB
     char *piece_buffer = new char[piece_length];
@@ -243,7 +241,7 @@ bool download_piece(int &client_socket, int piece_index, int piece_length, const
         }
     }
 
-    if (!write_to_file(filename, piece_buffer, piece_length))
+    if (!write_to_file(output_filename, piece_buffer, piece_length))
     {
         delete[] piece_buffer;
         return false;
