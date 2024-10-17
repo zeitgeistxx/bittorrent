@@ -158,7 +158,8 @@ int main(int argc, char *argv[])
         std::string filename = argv[2];
         std::string peer_info = argv[3];
         int sockfd;
-        auto peerID = peer_handshake(filename, peer_info, sockfd);
+        const auto peer_id = generatePeerID();
+        auto peerID = peer_handshake(filename, peer_info, sockfd, peer_id);
         close(sockfd);
         std::cout << "Peer ID: " << peerID << std::endl;
     }
