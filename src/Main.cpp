@@ -86,7 +86,7 @@ void piece_download(const std::string output_file, const std::string &filename, 
     size_t piece_length = decoded_data["info"]["piece length"];
 
     auto peers = discover_peers(filename);
-    
+
     int sockfd;
     peer_handshake(filename, peers[0], sockfd);
 
