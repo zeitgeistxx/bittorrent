@@ -2,8 +2,10 @@
 #define UTILS
 
 #include <fstream>
+#include <sys/stat.h>
+#include <sys/types.h>
 
-ssize_t recv_all(int sockfd, char *buffer, size_t length)
+ssize_t recv_all(int &sockfd, char *buffer, size_t length)
 {
     ssize_t total_received = 0;
 
@@ -27,7 +29,7 @@ ssize_t recv_all(int sockfd, char *buffer, size_t length)
 }
 
 // receive peer message and extract message id and payload length
-bool receive_peer_message(int client_socket, int &message_id, size_t &payload_length)
+bool receive_peer_message(int &client_socket, int &message_id, size_t &payload_length)
 {
     char header[5] = {0}; // Receive 4 bytes (message length) + 1 byte (message ID)
 
@@ -99,8 +101,34 @@ std::string read_file(const std::string &filename)
     return buffer.str();
 }
 
+bool create_directory_if_not_exists(const std::string &dir)
+{
+    struct stat info;
+    if (stat(dir.c_str(), &info) != 0)
+    {
+        if (mkdir(dir.c_str(), 0777) != 0)
+        {
+            std::cerr << "Failed to create directory: " << dir << std::endl;
+            return false;
+        }
+    }
+    else if (!(info.st_mode & S_IFDIR))
+    {
+        std::cerr << dir << " is not a directory." << std::endl;
+        return false;
+    }
+    return true;
+}
+
 bool write_to_file(const std::string filename, const char *buffer, int length)
 {
+    std::string dir = filename.substr(0, filename.find_last_of('/'));
+
+    if (!create_directory_if_not_exists(dir))
+    {
+        return false;
+    }
+
     std::ofstream output_file(filename, std::ios::binary);
     if (!output_file)
     {
