@@ -94,7 +94,7 @@ void download_piece(const std::string output_file, const std::string &filename, 
     for (const auto peer : peers)
     {
         int sockfd;
-        peer_handshake(filename, peer, sockfd);
+        std::cout << peer_handshake(filename, peer, sockfd) << std::endl;
 
         sendInterested(sockfd);
         waitForUnchoke(sockfd);
