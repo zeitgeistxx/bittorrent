@@ -18,11 +18,11 @@ ssize_t recv_all(int &sockfd, char *buffer, size_t length)
             std::cerr << "Failed after receiving " << total_received << " bytes." << std::endl;
             return 0;
         }
-        else if (bytes_received == 0)
-        {
-            std::cerr << "Connection closed after receiving " << total_received << " bytes." << std::endl;
-            break; // Connection closed
-        }
+        // else if (bytes_received == 0)
+        // {
+        //     std::cerr << "Connection closed after receiving " << total_received << " bytes." << std::endl;
+        //     break; // Connection closed
+        // }
         total_received += bytes_received;
     }
     return total_received;
