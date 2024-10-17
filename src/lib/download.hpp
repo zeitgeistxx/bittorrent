@@ -38,6 +38,7 @@ bool waitForBitField(int &sockfd)
         char *payload_buffer = new char[payload_length];
         ssize_t bytes_skipped = recv_all(sockfd, payload_buffer, payload_length);
         delete[] payload_buffer;
+
         if (bytes_skipped != payload_length)
         {
             std::cerr << "Error skipping bitfield payload." << std::endl;
@@ -107,8 +108,7 @@ bool waitForUnchoke(int &sockfd)
 
 bool requestPiece(int &sockfd, int piece_index, int block_offset, size_t block_length)
 {
-    std::cout << "requesting piece" << std::endl;
-    unsigned char request[17]; // 1 byte for message ID, (4 bytes for length and 12 bytes for the payload)
+    char request[17]; // 4 bytes prefix, (1 byte for message_id and 12 bytes for the payload)
 
     uint32_t request_len = htonl(13); // paylaod + message_id
 
@@ -135,7 +135,6 @@ bool requestPiece(int &sockfd, int piece_index, int block_offset, size_t block_l
 
 bool receivePiece(int &sockfd, char *piece_buffer, int piece_index, int block_offset, size_t block_length)
 {
-    std::cout << "receiveing piece" << std::endl;
     // Message header is 9 bytes: 4 bytes for piece index, 4 bytes for block offset, 1 byte for ID
     char message_header[13];
 
