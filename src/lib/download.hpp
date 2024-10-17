@@ -25,6 +25,7 @@
 
 bool waitForBitField(int &sockfd)
 {
+    std::cout << "waiting for bitfield" << std::endl;
     int message_id;
     size_t payload_length;
 
@@ -54,6 +55,7 @@ bool waitForBitField(int &sockfd)
 
 bool sendInterested(int &sockfd)
 {
+    std::cout << "interested message" << std::endl;
     unsigned char message[5] = {0};
 
     uint32_t message_len = htonl(1); // Length of payload (1 byte for message_id)
@@ -72,6 +74,7 @@ bool sendInterested(int &sockfd)
 
 bool waitForUnchoke(int &sockfd)
 {
+    std::cout << "unchoke message" << std::endl;
     int message_id;
     size_t payload_length;
 
