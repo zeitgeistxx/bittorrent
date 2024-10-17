@@ -169,14 +169,14 @@ int main(int argc, char *argv[])
     }
     else if (command == "download_piece")
     {
-        if (argc < 5)
+        if (argc < 6)
         {
             std::cerr << "Usage: " << argv[0] << " download_piece -o /tmp/<filename> <torrent_file> 0" << std::endl;
             return 1;
         }
-        std::string output_file = argv[2];
-        std::string filename = argv[3];
-        int piece_index = std::stoi(argv[4]);
+        std::string output_file = argv[3];
+        std::string filename = argv[4];
+        int piece_index = std::stoi(argv[5]);
         download_piece(output_file, filename, piece_index);
     }
     else
