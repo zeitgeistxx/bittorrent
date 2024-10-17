@@ -208,6 +208,8 @@ bool download_piece(int &client_socket, int piece_index, int piece_length, const
         return false;
     }
 
+    std::cout << filename << std::endl;
+
     const int BLOCK_SIZE = 16 * 1024; // break piece into blocks of 16 KiB
     char *piece_buffer = new char[piece_length];
     size_t total_received = 0;
