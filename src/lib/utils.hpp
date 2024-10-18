@@ -97,16 +97,16 @@ std::string read_file(const std::string &filename)
 
     std::stringstream buffer;
     buffer << file.rdbuf();
-    file.close();
+
     return buffer.str();
 }
 
 bool create_directory_if_not_exists(const std::string &dir)
 {
     struct stat info;
-    if (stat(dir.c_str(), &info) != 0)
+    if (stat(dir.c_str(), &info) != 0) // if diretory not exists
     {
-        if (mkdir(dir.c_str(), 0777) != 0)
+        if (mkdir(dir.c_str(), 0777) != 0) // crate directory
         {
             std::cerr << "Failed to create directory: " << dir << std::endl;
             return false;
