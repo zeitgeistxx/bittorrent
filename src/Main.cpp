@@ -13,16 +13,6 @@
 #include "lib/utils.hpp"
 #include "lib/download.hpp"
 
-std::string piece_hashes(const std::string &info_piece)
-{
-    std::stringstream ss;
-    for (unsigned char byte : info_piece)
-    {
-        ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte);
-    }
-    return ss.str();
-}
-
 void parse_torrent(const std::string &filename)
 {
     auto content = read_file(filename);
@@ -41,7 +31,7 @@ void parse_torrent(const std::string &filename)
     for (size_t i = 0; i < decoded_data["info"]["pieces"].get<std::string>().length(); i += 20)
     {
         std::string piece = decoded_data["info"]["pieces"].get<std::string>().substr(i, 20);
-        std::cout << piece_hashes(piece) << std::endl;
+        std::cout << calculate_piece_hash(piece) << std::endl;
     }
 }
 
@@ -79,22 +69,28 @@ std::string peer_handshake(const std::string &filename, const std::string &peer,
     return sendHandShake(peer_ip, peer_port, info_hash, peer_id, sockfd);
 }
 
-void piece_download(const std::string output_file, const std::string &filename, int piece_index)
+void piece_download(const std::string output_file, const std::string &filename, const int &piece_index)
 {
     auto content = read_file(filename);
     auto decoded_data = decode_bencoded_value(content);
-    size_t piece_length = decoded_data["info"]["piece length"];
+    const int file_length = decoded_data["info"]["length"];
+    const int piece_length = decoded_data["info"]["piece length"];
+    const auto piece_hash = calculate_piece_hash(decoded_data["info"]["pieces"].get<std::string>().substr(piece_index * 20, 20));
 
     auto peers = discover_peers(filename);
 
     int sockfd;
     peer_handshake(filename, peers[0], sockfd);
 
-    if (!download_piece(sockfd, piece_index, piece_length, output_file))
+    if (!download_piece(sockfd, file_length, piece_index, piece_length, piece_hash, output_file))
     {
-        close(sockfd);
-        return;
+        std::cout << "piece-" << piece_index << " download failed." << std::endl;
     }
+    else
+    {
+        std::cout << "piece-" << piece_index << " download successfully." << std::endl;
+    }
+    close(sockfd);
 }
 
 int main(int argc, char *argv[])
@@ -168,7 +164,7 @@ int main(int argc, char *argv[])
         }
         std::string output_file = argv[3];
         std::string filename = argv[4];
-        int piece_index = std::atoi(argv[5]);
+        const auto piece_index = std::atoi(argv[5]);
         piece_download(output_file, filename, piece_index);
     }
     else

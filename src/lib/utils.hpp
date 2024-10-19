@@ -5,13 +5,14 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-ssize_t recv_all(int &sockfd, char *buffer, size_t length)
+ssize_t receive_all(int &sockfd, char *buffer, size_t length)
 {
     ssize_t total_received = 0;
 
     while (total_received < length)
     {
-        ssize_t bytes_received = recv(sockfd, buffer + total_received, length - total_received, 0);
+        auto bytes_received = recv(sockfd, buffer + total_received, length - total_received, 0);
+
         if (bytes_received < 0)
         {
             perror("recv");
@@ -20,8 +21,8 @@ ssize_t recv_all(int &sockfd, char *buffer, size_t length)
         }
         else if (bytes_received == 0)
         {
-            std::cerr << "Connection closed after receiving " << total_received << " bytes." << std::endl;
-            break; // Connection closed
+            std::cerr << "Received " << total_received << " bytes." << std::endl;
+            break;
         }
         total_received += bytes_received;
     }
@@ -31,9 +32,9 @@ ssize_t recv_all(int &sockfd, char *buffer, size_t length)
 // receive peer message and extract message id and payload length
 bool receive_peer_message(int &client_socket, int &message_id, size_t &payload_length)
 {
-    char header[5] = {0}; // Receive 4 bytes (message length) + 1 byte (message ID)
+    char header[5] = {0}; // 4B (message_length) + 1B (message_id)
 
-    ssize_t bytes_received = recv_all(client_socket, header, sizeof(header));
+    auto bytes_received = receive_all(client_socket, header, sizeof(header));
     if (bytes_received != sizeof(header))
     {
         std::cerr << "Failed to receive peer message header." << std::endl;
@@ -42,7 +43,11 @@ bool receive_peer_message(int &client_socket, int &message_id, size_t &payload_l
 
     uint32_t length = ntohl(*(uint32_t *)header);       // Convert network byte order to host byte order
     message_id = static_cast<unsigned char>(header[4]); // 5th byte is the message ID
-    payload_length = length - 1;
+
+    if (length > 1)
+    {
+        payload_length = length - 1;
+    }
     return true;
 }
 
@@ -77,13 +82,39 @@ std::string hex_to_string(const std::string &in)
     return output;
 }
 
+std::string calculate_hash(const std::string input)
+{
+    SHA1 sha1;
+    sha1.update(input);
+    return sha1.final();
+}
+
 std::string calculate_info_hash(const json &info_dict)
 {
     auto bencoded_info = bencode_torrent(info_dict);
 
-    SHA1 sha1;
-    sha1.update(bencoded_info);
-    return sha1.final();
+    return calculate_hash(bencoded_info);
+}
+
+std::string calculate_piece_hash(const std::string &info_piece)
+{
+    std::stringstream ss;
+    for (unsigned char byte : info_piece)
+    {
+        ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte);
+    }
+    return ss.str();
+}
+
+bool check_piece_integrity(const std::string data, const std::string piece_hash)
+{
+    auto computed_hash = calculate_hash(data);
+    if (computed_hash != piece_hash)
+    {
+        std::cerr << "Hash mismatched. Expected: " << piece_hash << ", Computed: " << computed_hash << std::endl;
+        return false;
+    }
+    return true;
 }
 
 std::string read_file(const std::string &filename)

@@ -36,7 +36,7 @@ bool waitForBitField(int &sockfd)
     if (message_id == 5) // skip the payload
     {
         char *payload_buffer = new char[payload_length];
-        ssize_t bytes_skipped = recv_all(sockfd, payload_buffer, payload_length);
+        auto bytes_skipped = receive_all(sockfd, payload_buffer, payload_length);
         delete[] payload_buffer;
 
         if (bytes_skipped != payload_length)
@@ -57,7 +57,7 @@ bool sendInterested(int &sockfd)
 {
     unsigned char message[5] = {0};
 
-    uint32_t message_len = htonl(1); // Length of payload (1 byte for message_id)
+    uint32_t message_len = htonl(1); // Length of payload (1B for message_id)
 
     memcpy(message, &message_len, sizeof(message_len));
     message[4] = 2;
@@ -93,7 +93,7 @@ bool waitForUnchoke(int &sockfd)
             if (payload_length > 0)
             {
                 char *payload_buffer = new char[payload_length];
-                ssize_t bytes_skipped = recv_all(sockfd, payload_buffer, payload_length);
+                auto bytes_skipped = receive_all(sockfd, payload_buffer, payload_length);
                 delete[] payload_buffer;
 
                 if (bytes_skipped != payload_length)
@@ -108,17 +108,17 @@ bool waitForUnchoke(int &sockfd)
 
 bool requestPiece(int &sockfd, int piece_index, int block_offset, size_t block_length)
 {
-    char request[17]; // 4 bytes prefix, (1 byte for message_id and 12 bytes for the payload)
+    char request[17]; // 4B (message_length) + 1B (message_id) + 12B (payload_length = piece_index + piece_offset + piece_length)
 
-    uint32_t request_len = htonl(13); // paylaod + message_id
+    auto request_len = htonl(13); // paylaod + message_id
 
     memcpy(request, &request_len, sizeof(request_len));
     request[4] = 6;
 
     // payload
-    uint32_t piece_index_network = htonl(piece_index);
-    uint32_t block_offset_network = htonl(block_offset);
-    uint32_t block_length_network = htonl(block_length);
+    auto piece_index_network = htonl(piece_index);
+    auto block_offset_network = htonl(block_offset);
+    auto block_length_network = htonl(block_length);
 
     memcpy(request + 5, &piece_index_network, sizeof(piece_index_network));
     memcpy(request + 9, &block_offset_network, sizeof(block_offset_network));
@@ -135,24 +135,25 @@ bool requestPiece(int &sockfd, int piece_index, int block_offset, size_t block_l
 
 bool receivePiece(int &sockfd, char *piece_buffer, int piece_index, int block_offset, size_t block_length)
 {
-    // Message header is 9 bytes: 4 bytes for piece index, 4 bytes for block offset, 1 byte for ID
-    char message_header[13];
+    char message_header[13]; // 4B (message_length) + 1B (message_id) + 4B (piece_index) + 4B (block_offset)
 
-    auto bytes_received = recv_all(sockfd, message_header, sizeof(message_header));
+    auto bytes_received = receive_all(sockfd, message_header, sizeof(message_header));
 
     if (bytes_received < 0)
     {
         std::cerr << "Error receiving piece header: " << strerror(errno) << std::endl;
         return false;
     }
-    else if (bytes_received = 0)
+    else if (bytes_received == 0)
     {
         std::cerr << "Connection closed by the peer while receiving piece header." << std::endl;
         return false;
     }
 
+    // extract message length (first 4 bytes)
     auto message_len = ntohl(*reinterpret_cast<uint32_t *>(message_header));
 
+    // extract next 1 byte for message_id
     auto message_id = static_cast<uint8_t>(message_header[4]);
     if (message_id != 7)
     {
@@ -160,8 +161,9 @@ bool receivePiece(int &sockfd, char *piece_buffer, int piece_index, int block_of
         return false;
     }
 
-    uint32_t received_piece_index = ntohl(*reinterpret_cast<uint32_t *>(message_header + 5));
-    uint32_t received_block_offset = ntohl(*reinterpret_cast<uint32_t *>(message_header + 9));
+    // extract the piece index and block offset
+    auto received_piece_index = ntohl(*reinterpret_cast<uint32_t *>(message_header + 5));
+    auto received_block_offset = ntohl(*reinterpret_cast<uint32_t *>(message_header + 9));
 
     if (received_piece_index != piece_index || received_block_offset != block_offset)
     {
@@ -172,7 +174,7 @@ bool receivePiece(int &sockfd, char *piece_buffer, int piece_index, int block_of
         return false;
     }
 
-    ssize_t block_bytes_received = recv_all(sockfd, piece_buffer + block_offset, block_length);
+    ssize_t block_bytes_received = receive_all(sockfd, piece_buffer + block_offset, block_length);
     if (block_bytes_received < 0)
     {
         std::cerr << "Error receiving piece block data: " << strerror(errno) << std::endl;
@@ -183,41 +185,55 @@ bool receivePiece(int &sockfd, char *piece_buffer, int piece_index, int block_of
         std::cerr << "Connection closed before receiving full block data." << std::endl;
         return false;
     }
+
     if (block_bytes_received != block_length)
     {
         std::cerr << "Expected " << block_length << " bytes, but received " << block_bytes_received << " bytes." << std::endl;
         return false;
     }
+
     return true;
 }
 
-bool download_piece(int &client_socket, int piece_index, int piece_length, const std::string &output_filename)
+bool download_piece(int &client_socket, const int &file_length, const int &piece_index, const int &piece_length, const std::string &piece_hash, const std::string &output_filename)
 {
     if (!waitForBitField(client_socket))
     {
         return false;
     }
-    std::cout << "Waited for bitfield" << std::endl;
 
     if (!sendInterested(client_socket))
     {
         return false;
     }
-    std::cout << "send interested message" << std::endl;
 
     if (!waitForUnchoke(client_socket))
     {
         return false;
     }
-    std::cout << "Waited for unchoke" << std::endl;
 
     const int BLOCK_SIZE = 16 * 1024; // break piece into blocks of 16 KiB
-    char *piece_buffer = new char[piece_length];
     size_t total_received = 0;
 
-    for (int block_offset = 0; block_offset < piece_length; block_offset += BLOCK_SIZE)
+    const auto downloaded = piece_index * piece_length;
+    if (downloaded >= file_length)
     {
-        int block_length = std::min(BLOCK_SIZE, piece_length - block_offset);
+        return false;
+    }
+
+    const auto actual_piece_length = std::min(piece_length, file_length - downloaded);
+
+    char *piece_buffer = new char[actual_piece_length];
+
+    for (int block_offset = 0; block_offset < actual_piece_length; block_offset += BLOCK_SIZE)
+    {
+        auto left_to_download = file_length - downloaded - block_offset;
+        auto block_length = std::min(BLOCK_SIZE, left_to_download);
+
+        if (block_length == 0)
+        {
+            break;
+        }
 
         if (!requestPiece(client_socket, piece_index, block_offset, block_length))
         {
@@ -231,20 +247,22 @@ bool download_piece(int &client_socket, int piece_index, int piece_length, const
             return false;
         }
 
-        if (block_length == 0)
-        {
-            break;
-        }
-
         total_received += block_length;
 
-        if (total_received >= piece_length)
+        if (total_received >= actual_piece_length)
         {
-            break; // all blocks for this piece have been received
+            break; // all blocks for this piece have been downloaded
         }
     }
 
-    if (!write_to_file(output_filename, piece_buffer, piece_length))
+    std::string piece_data(piece_buffer, actual_piece_length);
+    if (!check_piece_integrity(piece_data, piece_hash))
+    {
+        delete[] piece_buffer;
+        return false;
+    }
+
+    if (!write_to_file(output_filename, piece_buffer, actual_piece_length))
     {
         delete[] piece_buffer;
         return false;
