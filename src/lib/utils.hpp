@@ -5,6 +5,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "handshake.hpp"
+
 ssize_t receive_all(int &sockfd, char *buffer, size_t length)
 {
     ssize_t total_received = 0;
@@ -105,18 +107,6 @@ std::string calculate_piece_hash(const std::string &info_piece)
     }
     return ss.str();
 }
-
-bool check_piece_integrity(const std::string data, const std::string piece_hash)
-{
-    auto computed_hash = calculate_hash(data);
-    if (computed_hash != piece_hash)
-    {
-        std::cerr << "Hash mismatched. Expected: " << piece_hash << ", Computed: " << computed_hash << std::endl;
-        return false;
-    }
-    return true;
-}
-
 std::string read_file(const std::string &filename)
 {
     std::ifstream file(filename, std::ios::binary);
@@ -130,6 +120,18 @@ std::string read_file(const std::string &filename)
     buffer << file.rdbuf();
 
     return buffer.str();
+}
+
+void torrent_file_info(const std::string filename, std::string &tracker_url, json &info, size_t &length, size_t &piece_length, std::string &pieces)
+{
+    auto content = read_file(filename);
+    auto decoded_data = decode_bencoded_value(content);
+
+    decoded_data["announce"].get_to(tracker_url);
+    decoded_data["info"].get_to(info);
+    decoded_data["info"]["length"].get_to(length);
+    decoded_data["info"]["piece length"].get_to(piece_length);
+    decoded_data["info"]["pieces"].get_to(pieces);
 }
 
 bool create_directory_if_not_exists(const std::string &dir)
@@ -151,7 +153,7 @@ bool create_directory_if_not_exists(const std::string &dir)
     return true;
 }
 
-bool write_to_file(const std::string filename, const char *buffer, int length)
+bool write_piece_to_file(const std::string filename, const std::string &data)
 {
     std::string dir = filename.substr(0, filename.find_last_of('/'));
 
@@ -160,21 +162,45 @@ bool write_to_file(const std::string filename, const char *buffer, int length)
         return false;
     }
 
-    std::ofstream output_file(filename, std::ios::binary);
-    if (!output_file)
+    std::ofstream output_file(filename, std::ios::binary | std::ios::app);
+    if (!output_file.is_open())
     {
         std::cerr << "Failed to open output file." << std::endl;
         return false;
     }
 
-    output_file.write(buffer, length);
-    if (!output_file)
+    output_file << data;
+    if (output_file.fail())
     {
         std::cerr << "Failed to write to output file." << std::endl;
         return false;
     }
 
     return true;
+}
+
+bool check_piece_integrity(const std::string data, const std::string piece_hash)
+{
+    auto computed_hash = calculate_hash(data);
+    if (computed_hash != piece_hash)
+    {
+        std::cerr << "Hash mismatched. Expected: " << piece_hash << ", Computed: " << computed_hash << std::endl;
+        return false;
+    }
+    return true;
+}
+
+int connect_to_peer(const std::string &peer_info, const std::string &info_hash)
+{
+    std::string peer_ip;
+    int peer_port;
+    split_ip_port(peer_info, peer_ip, peer_port);
+
+    const auto peer_id = generatePeerID();
+
+    int client_fd;
+    sendHandShake(peer_ip, peer_port, info_hash, peer_id, client_fd);
+    return client_fd;
 }
 
 #endif

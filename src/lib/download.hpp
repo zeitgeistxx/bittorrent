@@ -1,10 +1,14 @@
 #ifndef DOWNLOAD_PIECE
 #define DOWNLOAD_PIECE
 
+#include <cmath>
 #include <cstring>
 #include <cstdio>
+#include <optional>
 #include <netinet/in.h>
 #include <sys/socket.h>
+
+#include "work_queue.hpp"
 
 // htonl() function stands for "host to network long", used in network programming to convert a 32-bit integer from host byte order to network byte order. Network byte order is big-endian, which means the most significant byte is stored at the lowest memory address.
 
@@ -195,21 +199,21 @@ bool receivePiece(int &sockfd, char *piece_buffer, int piece_index, int block_of
     return true;
 }
 
-bool download_piece(int &client_socket, const int &file_length, const int &piece_index, const int &piece_length, const std::string &piece_hash, const std::string &output_filename)
+std::optional<std::string> download_piece(int &client_socket, const int &file_length, const int &piece_index, const int &piece_length, const std::string &pieces)
 {
     if (!waitForBitField(client_socket))
     {
-        return false;
+        return std::nullopt;
     }
 
     if (!sendInterested(client_socket))
     {
-        return false;
+        return std::nullopt;
     }
 
     if (!waitForUnchoke(client_socket))
     {
-        return false;
+        return std::nullopt;
     }
 
     const int BLOCK_SIZE = 16 * 1024; // break piece into blocks of 16 KiB
@@ -218,7 +222,7 @@ bool download_piece(int &client_socket, const int &file_length, const int &piece
     const auto downloaded = piece_index * piece_length;
     if (downloaded >= file_length)
     {
-        return false;
+        return std::nullopt;
     }
 
     const auto actual_piece_length = std::min(piece_length, file_length - downloaded);
@@ -238,13 +242,13 @@ bool download_piece(int &client_socket, const int &file_length, const int &piece
         if (!requestPiece(client_socket, piece_index, block_offset, block_length))
         {
             delete[] piece_buffer;
-            return false;
+            return std::nullopt;
         }
 
         if (!receivePiece(client_socket, piece_buffer, piece_index, block_offset, block_length))
         {
             delete[] piece_buffer;
-            return false;
+            return std::nullopt;
         }
 
         total_received += block_length;
@@ -255,20 +259,92 @@ bool download_piece(int &client_socket, const int &file_length, const int &piece
         }
     }
 
+    const auto piece_hash = calculate_piece_hash(pieces.substr(piece_index * 20, 20));
     std::string piece_data(piece_buffer, actual_piece_length);
     if (!check_piece_integrity(piece_data, piece_hash))
     {
         delete[] piece_buffer;
-        return false;
-    }
-
-    if (!write_to_file(output_filename, piece_buffer, actual_piece_length))
-    {
-        delete[] piece_buffer;
-        return false;
+        return std::nullopt;
     }
 
     delete[] piece_buffer;
+    return piece_data;
+}
+
+bool process_torrent_download(const std::string &info_hash, const std::vector<std::string> &peers, const int &file_length, const int &piece_length, const std::string &pieces, const std::string &output_filename)
+{
+    const auto piece_count = (int)(ceil(static_cast<double>(file_length) / static_cast<double>(piece_length)));
+
+    ThreadSafeWorkQueue<int> work_queue;
+    std::vector<std::optional<std::string>> downloaded_pieces(piece_count);
+    std::mutex write_mtx;
+    std::atomic<bool> download_failed(false);
+
+    for (int piece_index = 0; piece_index < piece_count; ++piece_index)
+    {
+        work_queue.push(piece_index);
+    }
+    work_queue.set_done();
+
+    auto worker = [&](const std::string &peer_info)
+    {
+        int client_socket = connect_to_peer(peer_info, info_hash);
+        if (client_socket < 0)
+        {
+            std::cerr << "Failed to connect to peer: " << peer_info << std::endl;
+            download_failed = true;
+            return;
+        }
+
+        int piece_index;
+        while (work_queue.try_pop(piece_index) && !download_failed)
+        {
+            auto piece_data = download_piece(client_socket, file_length, piece_index, piece_length, pieces);
+            if (piece_data.has_value())
+            {
+                std::lock_guard<std::mutex> lock(write_mtx);
+                downloaded_pieces[piece_index] = piece_data.value();
+            }
+            else
+            {
+                // work_queue.push(piece_index);
+            }
+        }
+        close(client_socket);
+    };
+
+    std::vector<std::thread> workers;
+    for (const auto &peer : peers)
+    {
+        workers.emplace_back(worker, peer);
+    }
+
+    if (download_failed)
+    {
+        std::cerr << "File download failed." << std::endl;
+        return false;
+    }
+
+    for (auto &worker_thread : workers)
+    {
+        if (worker_thread.joinable())
+        {
+            worker_thread.join();
+        }
+    }
+
+    for (const auto &piece_data : downloaded_pieces)
+    {
+        if (piece_data.has_value())
+        {
+            write_piece_to_file(output_filename, piece_data.value());
+        }
+        else
+        {
+            std::cerr << "Missing or corrupted piece" << std::endl;
+            return false;
+        }
+    }
     return true;
 }
 
