@@ -85,7 +85,7 @@ bool waitForUnchoke(int &sockfd)
 {
     int message_id;
     size_t payload_length;
-
+    std::cout << "Waiting to unchoke" << std::endl;
     // continuously wait for messages until an unchoke message is received
     while (true)
     {
@@ -96,10 +96,14 @@ bool waitForUnchoke(int &sockfd)
 
         if (message_id == 1)
         {
+            std::cout << "unchoked" << std::endl;
             return true;
         }
         else
         {
+            std::cout << "still choking" << std::endl;
+            std::cout << message_id << std::endl;
+            std::cout << payload_length << std::endl;
             if (payload_length > 0)
             {
                 char *payload_buffer = new char[payload_length];
@@ -202,16 +206,19 @@ bool receivePiece(int &sockfd, char *piece_buffer, int piece_index, int block_of
     return true;
 }
 
-std::optional<std::string> download_piece(int &client_socket, const int &file_length, const int &piece_index, const int &piece_length, const std::string &pieces)
+std::optional<std::string> download_piece(int &client_socket, const int &file_length, const int &piece_index, const int &piece_length, const std::string &pieces, bool skip_initial_handshake)
 {
-    if (!waitForBitField(client_socket))
+    if (!skip_initial_handshake)
     {
-        return std::nullopt;
-    }
+        if (!waitForBitField(client_socket))
+        {
+            return std::nullopt;
+        }
 
-    if (!sendInterested(client_socket))
-    {
-        return std::nullopt;
+        if (!sendInterested(client_socket))
+        {
+            return std::nullopt;
+        }
     }
 
     if (!waitForUnchoke(client_socket))
@@ -278,11 +285,8 @@ bool process_torrent_download(const std::string &info_hash, const std::vector<st
 {
     const auto piece_count = (int)(ceil(static_cast<double>(file_length) / static_cast<double>(piece_length)));
 
-    std::vector<std::optional<std::string>> downloaded_pieces(piece_count);
     ThreadSafeWorkQueue<int> work_queue;
     std::unordered_map<int, int> retry_count;
-    std::mutex write_mtx;
-    std::atomic<bool> download_failed(false);
 
     for (int piece_index = 0; piece_index < piece_count; ++piece_index)
     {
@@ -290,40 +294,68 @@ bool process_torrent_download(const std::string &info_hash, const std::vector<st
         retry_count[piece_index] = 0;
     }
 
+    std::mutex conn_mtx;
+    std::mutex write_mtx;
+    std::vector<std::optional<std::string>> downloaded_pieces(piece_count);
+    std::unordered_map<std::string, int> active_connections;
+    std::unordered_map<std::string, bool> initial_handshake_done;
+    std::atomic<bool> download_failed(false);
+
     auto worker = [&](const std::string &peer_info)
     {
-        int client_socket = connect_to_peer(peer_info, info_hash);
-        if (client_socket < 0)
+        int client_socket;
         {
-            std::cerr << "Failed to connect to peer: " << peer_info << std::endl;
-            download_failed = true;
-            return;
+            std::lock_guard<std::mutex> lock(conn_mtx);
+            client_socket = connect_to_peer(peer_info, info_hash);
+            if (client_socket < 0)
+            {
+                std::cerr << "Failed to connect to peer: " << peer_info << std::endl;
+                download_failed = true;
+                return;
+            }
+            active_connections[peer_info]++;
+            initial_handshake_done[peer_info] = false;
         }
 
-        int piece_index;
-        while (work_queue.try_pop(piece_index) && !download_failed)
+        while (!work_queue.is_done() && !download_failed)
         {
-            auto piece_data = download_piece(client_socket, file_length, piece_index, piece_length, pieces);
-            if (piece_data.has_value())
+            int piece_index;
+            if (work_queue.try_pop(piece_index))
             {
-                std::lock_guard<std::mutex> lock(write_mtx);
-                downloaded_pieces[piece_index] = piece_data.value();
-            }
-            else
-            {
-                if (retry_count[piece_index] < 3)
+                std::cout << "processing piece-" << piece_index << std::endl;
+                bool skip_handshake = initial_handshake_done[peer_info];
+                auto piece_data = download_piece(client_socket, file_length, piece_index, piece_length, pieces, skip_handshake);
+                if (piece_data.has_value())
                 {
-                    retry_count[piece_index]++;
-                    work_queue.push(piece_index);
+                    initial_handshake_done[peer_info] = true;
+                    std::lock_guard<std::mutex> lock(write_mtx);
+                    downloaded_pieces[piece_index] = piece_data.value();
                 }
                 else
                 {
-                    std::cerr << "Max retries reached for piece " << piece_index << std::endl;
-                    download_failed = true;
+                    if (retry_count[piece_index] < 3)
+                    {
+                        retry_count[piece_index]++;
+                        work_queue.push(piece_index);
+                    }
+                    else
+                    {
+                        std::cerr << "Max retries reached for piece " << piece_index << std::endl;
+                        download_failed = true;
+                    }
                 }
             }
         }
-        close(client_socket);
+
+        {
+            std::lock_guard<std::mutex> lock(conn_mtx);
+            active_connections[peer_info]--;
+            if (active_connections[peer_info] == 0)
+            {
+                close(client_socket);
+                active_connections.erase(peer_info);
+            }
+        }
     };
 
     std::vector<std::thread> workers;
@@ -331,6 +363,7 @@ bool process_torrent_download(const std::string &info_hash, const std::vector<st
     {
         workers.emplace_back(worker, peer);
     }
+    work_queue.set_done();
 
     for (auto &worker_thread : workers)
     {

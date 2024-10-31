@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "decoder.hpp"
 #include "encoder.hpp"
 #include "handshake.hpp"
 #include "sha.hpp"
@@ -69,10 +70,7 @@ bool receive_peer_message(int &client_socket, int &message_id, size_t &payload_l
     uint32_t length = ntohl(*(uint32_t *)header);       // Convert network byte order to host byte order
     message_id = static_cast<unsigned char>(header[4]); // 5th byte is the message ID
 
-    if (length > 1)
-    {
-        payload_length = length - 1;
-    }
+    payload_length = length - 1;
     return true;
 }
 

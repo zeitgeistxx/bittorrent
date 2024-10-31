@@ -3,7 +3,6 @@
 #include <cstdlib>
 #include <string>
 
-#include "lib/decoder.hpp"
 #include "lib/download.hpp"
 #include "lib/handshake.hpp"
 #include "lib/tracker.hpp"
@@ -84,9 +83,9 @@ void piece_download(const std::string output_file, const std::string torrent_fil
     const auto info_hash = hex_to_string(hash);
 
     auto peers = discover_peers(torrent_file);
-    int sockfd = connect_to_peer(peers[0], info_hash);
+    auto client_socket = connect_to_peer(peers[0], info_hash);
 
-    auto result = download_piece(sockfd, file_length, piece_index, piece_length, pieces);
+    auto result = download_piece(client_socket, file_length, piece_index, piece_length, pieces, false);
     if (result.has_value())
     {
         if (!write_piece_to_file(output_file, result.value()))
@@ -99,7 +98,7 @@ void piece_download(const std::string output_file, const std::string torrent_fil
     {
         std::cout << "piece-" << piece_index << " download failed." << std::endl;
     }
-    close(sockfd);
+    close(client_socket);
 }
 
 void file_download(const std::string output_file, const std::string torrent_file)
