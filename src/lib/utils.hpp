@@ -2,10 +2,33 @@
 #define UTILS
 
 #include <fstream>
+#include <random>
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "encoder.hpp"
 #include "handshake.hpp"
+#include "sha.hpp"
+
+std::string generatePeerID()
+{
+    const std::string charset = "abcdefghijklmnopqrstuvwxyz";
+
+    const size_t length = 20;
+    std::string peerID;
+
+    std::random_device rd;
+    std::mt19937 generator(rd());
+
+    std::uniform_int_distribution<size_t> distribution(0, charset.size() - 1);
+
+    for (size_t i = 0; i < length; ++i)
+    {
+        peerID += charset[distribution(generator)];
+    }
+
+    return peerID;
+}
 
 ssize_t receive_all(int &sockfd, char *buffer, size_t length)
 {

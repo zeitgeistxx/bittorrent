@@ -12,11 +12,8 @@ class ThreadSafeWorkQueue
     std::queue<T> queue;
     std::mutex mtx;
     std::condition_variable cv;
-    bool done;
 
 public:
-    explicit ThreadSafeWorkQueue() : done(false) {}
-
     void push(const T &item)
     {
         std::lock_guard<std::mutex> lock(mtx);
@@ -27,31 +24,19 @@ public:
     bool try_pop(T &item)
     {
         std::unique_lock<std::mutex> lock(mtx);
-        cv.wait(lock, [this]()
-                { return !queue.empty() || done; });
 
-        if (queue.empty() && done)
+        if (queue.empty())
             return false;
 
-        if (!queue.empty())
-        {
-            item = queue.front();
-            queue.pop();
-            return true;
-        }
-        return false;
+        item = queue.front();
+        queue.pop();
+        return true;
     }
 
-    void set_done()
+    bool empty()
     {
         std::lock_guard<std::mutex> lock(mtx);
-        done = true;
-        cv.notify_all();
-    }
-
-    bool is_done() const
-    {
-        return done && queue.empty();
+        return queue.empty();
     }
 };
 

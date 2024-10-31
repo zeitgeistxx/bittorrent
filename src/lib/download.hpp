@@ -1,16 +1,22 @@
 #ifndef DOWNLOAD_PIECE
 #define DOWNLOAD_PIECE
 
+#include <atomic>
 #include <cmath>
-#include <cstring>
 #include <cstdio>
-#include <optional>
+#include <cstring>
 #include <netinet/in.h>
+#include <optional>
 #include <sys/socket.h>
+#include <unordered_map>
 
 #include "work_queue.hpp"
+#include "utils.hpp"
 
-// htonl() function stands for "host to network long", used in network programming to convert a 32-bit integer from host byte order to network byte order. Network byte order is big-endian, which means the most significant byte is stored at the lowest memory address.
+// htonl() function stands for "host to network long", used in network
+// programming to convert a 32-bit integer from host byte order to network byte
+// order. Network byte order is big-endian, which means the most significant
+// byte is stored at the lowest memory address.
 
 // 0 - choke
 // 1 - unchoke
@@ -171,10 +177,7 @@ bool receivePiece(int &sockfd, char *piece_buffer, int piece_index, int block_of
 
     if (received_piece_index != piece_index || received_block_offset != block_offset)
     {
-        std::cerr << "Piece or block offset mismatch. Expected piece index: " << piece_index
-                  << ", received: " << received_piece_index
-                  << ", Expected block offset: " << block_offset
-                  << ", received: " << received_block_offset << std::endl;
+        std::cerr << "Piece or block offset mismatch. Expected piece index: " << piece_index << ", received: " << received_piece_index << ", Expected block offset: " << block_offset << ", received: " << received_block_offset << std::endl;
         return false;
     }
 
@@ -275,16 +278,17 @@ bool process_torrent_download(const std::string &info_hash, const std::vector<st
 {
     const auto piece_count = (int)(ceil(static_cast<double>(file_length) / static_cast<double>(piece_length)));
 
-    ThreadSafeWorkQueue<int> work_queue;
     std::vector<std::optional<std::string>> downloaded_pieces(piece_count);
+    ThreadSafeWorkQueue<int> work_queue;
+    std::unordered_map<int, int> retry_count;
     std::mutex write_mtx;
     std::atomic<bool> download_failed(false);
 
     for (int piece_index = 0; piece_index < piece_count; ++piece_index)
     {
         work_queue.push(piece_index);
+        retry_count[piece_index] = 0;
     }
-    work_queue.set_done();
 
     auto worker = [&](const std::string &peer_info)
     {
@@ -307,7 +311,16 @@ bool process_torrent_download(const std::string &info_hash, const std::vector<st
             }
             else
             {
-                // work_queue.push(piece_index);
+                if (retry_count[piece_index] < 3)
+                {
+                    retry_count[piece_index]++;
+                    work_queue.push(piece_index);
+                }
+                else
+                {
+                    std::cerr << "Max retries reached for piece " << piece_index << std::endl;
+                    download_failed = true;
+                }
             }
         }
         close(client_socket);
@@ -319,18 +332,19 @@ bool process_torrent_download(const std::string &info_hash, const std::vector<st
         workers.emplace_back(worker, peer);
     }
 
-    if (download_failed)
-    {
-        std::cerr << "File download failed." << std::endl;
-        return false;
-    }
-
     for (auto &worker_thread : workers)
     {
         if (worker_thread.joinable())
         {
             worker_thread.join();
         }
+    }
+
+    if (download_failed)
+    {
+        downloaded_pieces.clear();
+        std::cerr << "File download failed due to repeated piece download failures." << std::endl;
+        return false;
     }
 
     for (const auto &piece_data : downloaded_pieces)

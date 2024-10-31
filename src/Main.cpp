@@ -1,17 +1,13 @@
 #include <iostream>
-#include <iomanip>
-#include <string>
 #include <cctype>
 #include <cstdlib>
-#include <sstream>
+#include <string>
 
 #include "lib/decoder.hpp"
-#include "lib/encoder.hpp"
-#include "lib/sha.hpp"
-#include "lib/tracker.hpp"
-#include "lib/handshake.hpp"
-#include "lib/utils.hpp"
 #include "lib/download.hpp"
+#include "lib/handshake.hpp"
+#include "lib/tracker.hpp"
+#include "lib/utils.hpp"
 
 void parse_torrent(const std::string filename)
 {
@@ -55,7 +51,7 @@ std::vector<std::string> discover_peers(const std::string filename)
     return request_tracker(tracker_url, info_hash, peer_id, port, uploaded, downloaded, left);
 }
 
-std::string peer_handshake(const std::string filename, const std::string &peer, int &sockfd)
+void peer_handshake(const std::string filename, const std::string &peer)
 {
     json info;
     std::string tracker_url, pieces;
@@ -71,7 +67,9 @@ std::string peer_handshake(const std::string filename, const std::string &peer, 
     const auto hash = calculate_info_hash(info);
     const auto info_hash = hex_to_string(hash);
 
-    return sendHandShake(peer_ip, peer_port, info_hash, peer_id, sockfd);
+    int sockfd;
+    std::cout << "Peer ID: " << sendHandShake(peer_ip, peer_port, info_hash, peer_id, sockfd) << std::endl;
+    close(sockfd);
 }
 
 void piece_download(const std::string output_file, const std::string torrent_file, const int &piece_index)
@@ -82,10 +80,11 @@ void piece_download(const std::string output_file, const std::string torrent_fil
 
     torrent_file_info(torrent_file, tracker_url, info, file_length, piece_length, pieces);
 
-    auto peers = discover_peers(torrent_file);
+    const auto hash = calculate_info_hash(info);
+    const auto info_hash = hex_to_string(hash);
 
-    int sockfd;
-    peer_handshake(torrent_file, peers[0], sockfd);
+    auto peers = discover_peers(torrent_file);
+    int sockfd = connect_to_peer(peers[0], info_hash);
 
     auto result = download_piece(sockfd, file_length, piece_index, piece_length, pieces);
     if (result.has_value())
@@ -94,7 +93,6 @@ void piece_download(const std::string output_file, const std::string torrent_fil
         {
             std::cout << "write to file failed" << std::endl;
         }
-
         std::cout << "piece-" << piece_index << " downloaded successfully." << std::endl;
     }
     else
@@ -184,10 +182,7 @@ int main(int argc, char *argv[])
         }
         std::string filename = argv[2];
         std::string peer_info = argv[3];
-        int sockfd;
-        auto peerID = peer_handshake(filename, peer_info, sockfd);
-        close(sockfd);
-        std::cout << "Peer ID: " << peerID << std::endl;
+        peer_handshake(filename, peer_info);
     }
     else if (command == "download_piece")
     {
