@@ -37,15 +37,17 @@ std::string url_encode(const std::string &hex_string)
 
 size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp)
 {
-    ((std::string *)userp)->append((char *)contents, size * nmemb);
-    return size * nmemb;
+    auto *readBuffer = static_cast<std::vector<char> *>(userp);
+    size_t totalSize = size * nmemb;
+    readBuffer->insert(readBuffer->end(), (char *)contents, (char *)contents + totalSize);
+    return totalSize;
 }
 
 std::vector<std::string> request_tracker(const std::string &tracker_url, const std::string &info_hash, const std::string &peer_id, int port, int uploaded, int downloaded, int left)
 {
     CURL *curl;
     CURLcode res;
-    std::string readBuffer;
+    std::vector<char> readBuffer;
 
     // query parameters
     std::ostringstream oss;
@@ -71,7 +73,8 @@ std::vector<std::string> request_tracker(const std::string &tracker_url, const s
         }
         else
         {
-            auto decoded_response = decode_bencoded_value(readBuffer);
+            std::string response_str(readBuffer.begin(), readBuffer.end());
+            auto decoded_response = decode_bencoded_value(response_str);
             if (decoded_response.contains("peers"))
             {
                 const auto &peers = decoded_response["peers"].get<std::string>();

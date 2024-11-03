@@ -85,7 +85,7 @@ bool waitForUnchoke(int &sockfd)
 {
     int message_id;
     size_t payload_length;
-    std::cout << "Waiting to unchoke" << std::endl;
+
     // continuously wait for messages until an unchoke message is received
     while (true)
     {
@@ -96,14 +96,10 @@ bool waitForUnchoke(int &sockfd)
 
         if (message_id == 1)
         {
-            std::cout << "unchoked" << std::endl;
             return true;
         }
         else
         {
-            std::cout << "still choking" << std::endl;
-            std::cout << message_id << std::endl;
-            std::cout << payload_length << std::endl;
             if (payload_length > 0)
             {
                 char *payload_buffer = new char[payload_length];
@@ -147,7 +143,7 @@ bool requestPiece(int &sockfd, int piece_index, int block_offset, size_t block_l
     return true;
 }
 
-bool receivePiece(int &sockfd, char *piece_buffer, int piece_index, int block_offset, size_t block_length)
+bool receivePiece(int &sockfd, std::vector<uint8_t> &piece_buffer, int piece_index, int block_offset, size_t block_length)
 {
     char message_header[13]; // 4B (message_length) + 1B (message_id) + 4B (piece_index) + 4B (block_offset)
 
@@ -185,7 +181,7 @@ bool receivePiece(int &sockfd, char *piece_buffer, int piece_index, int block_of
         return false;
     }
 
-    ssize_t block_bytes_received = receive_all(sockfd, piece_buffer + block_offset, block_length);
+    ssize_t block_bytes_received = receive_all(sockfd, reinterpret_cast<char*>(piece_buffer.data()) + block_offset, block_length);
     if (block_bytes_received < 0)
     {
         std::cerr << "Error receiving piece block data: " << strerror(errno) << std::endl;
@@ -206,7 +202,7 @@ bool receivePiece(int &sockfd, char *piece_buffer, int piece_index, int block_of
     return true;
 }
 
-std::optional<std::string> download_piece(int &client_socket, const int &file_length, const int &piece_index, const int &piece_length, const std::string &pieces, bool skip_initial_handshake)
+std::optional<std::vector<uint8_t>> download_piece(int &client_socket, const int &file_length, const int &piece_index, const int &piece_length, const std::string &pieces, bool skip_initial_handshake)
 {
     if (!skip_initial_handshake)
     {
@@ -237,7 +233,7 @@ std::optional<std::string> download_piece(int &client_socket, const int &file_le
 
     const auto actual_piece_length = std::min(piece_length, file_length - downloaded);
 
-    char *piece_buffer = new char[actual_piece_length];
+    std::vector<uint8_t> piece_buffer(actual_piece_length);
 
     for (int block_offset = 0; block_offset < actual_piece_length; block_offset += BLOCK_SIZE)
     {
@@ -251,13 +247,11 @@ std::optional<std::string> download_piece(int &client_socket, const int &file_le
 
         if (!requestPiece(client_socket, piece_index, block_offset, block_length))
         {
-            delete[] piece_buffer;
             return std::nullopt;
         }
 
         if (!receivePiece(client_socket, piece_buffer, piece_index, block_offset, block_length))
         {
-            delete[] piece_buffer;
             return std::nullopt;
         }
 
@@ -270,20 +264,18 @@ std::optional<std::string> download_piece(int &client_socket, const int &file_le
     }
 
     const auto piece_hash = calculate_piece_hash(pieces.substr(piece_index * 20, 20));
-    std::string piece_data(piece_buffer, actual_piece_length);
-    if (!check_piece_integrity(piece_data, piece_hash))
+    if (!check_piece_integrity(piece_buffer, piece_hash))
     {
-        delete[] piece_buffer;
         return std::nullopt;
     }
 
-    delete[] piece_buffer;
-    return piece_data;
+    return piece_buffer;
 }
 
 bool process_torrent_download(const std::string &info_hash, const std::vector<std::string> &peers, const int &file_length, const int &piece_length, const std::string &pieces, const std::string &output_filename)
 {
     const auto piece_count = (int)(ceil(static_cast<double>(file_length) / static_cast<double>(piece_length)));
+    std::cout << "pieces -> " << piece_count << std::endl;
 
     ThreadSafeWorkQueue<int> work_queue;
     std::unordered_map<int, int> retry_count;
@@ -296,7 +288,7 @@ bool process_torrent_download(const std::string &info_hash, const std::vector<st
 
     std::mutex conn_mtx;
     std::mutex write_mtx;
-    std::vector<std::optional<std::string>> downloaded_pieces(piece_count);
+    std::vector<std::optional<std::vector<uint8_t>>> downloaded_pieces(piece_count);
     std::unordered_map<std::string, int> active_connections;
     std::unordered_map<std::string, bool> initial_handshake_done;
     std::atomic<bool> download_failed(false);

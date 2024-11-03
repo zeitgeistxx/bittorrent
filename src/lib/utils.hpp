@@ -55,7 +55,7 @@ ssize_t receive_all(int &sockfd, char *buffer, size_t length)
     return total_received;
 }
 
-// receive peer message and extract message id and payload length
+// Receive peer message and extract message id and payload length
 bool receive_peer_message(int &client_socket, int &message_id, size_t &payload_length)
 {
     char header[5] = {0}; // 4B (message_length) + 1B (message_id)
@@ -128,6 +128,7 @@ std::string calculate_piece_hash(const std::string &info_piece)
     }
     return ss.str();
 }
+
 std::string read_file(const std::string &filename)
 {
     std::ifstream file(filename, std::ios::binary);
@@ -174,7 +175,7 @@ bool create_directory_if_not_exists(const std::string &dir)
     return true;
 }
 
-bool write_piece_to_file(const std::string filename, const std::string &data)
+bool write_piece_to_file(const std::string filename, const std::vector<uint8_t> &data)
 {
     std::string dir = filename.substr(0, filename.find_last_of('/'));
 
@@ -190,7 +191,9 @@ bool write_piece_to_file(const std::string filename, const std::string &data)
         return false;
     }
 
-    output_file << data;
+    // std::string data_str(data.begin(), data.end());
+    // output_file << data_str;
+    output_file.write(reinterpret_cast<char const *>(data.data()), data.size());
     if (output_file.fail())
     {
         std::cerr << "Failed to write to output file." << std::endl;
@@ -200,9 +203,10 @@ bool write_piece_to_file(const std::string filename, const std::string &data)
     return true;
 }
 
-bool check_piece_integrity(const std::string data, const std::string piece_hash)
+bool check_piece_integrity(const std::vector<uint8_t> &data, const std::string piece_hash)
 {
-    auto computed_hash = calculate_hash(data);
+    std::string data_str(data.begin(), data.end());
+    auto computed_hash = calculate_hash(data_str);
     if (computed_hash != piece_hash)
     {
         std::cerr << "Hash mismatched. Expected: " << piece_hash << ", Computed: " << computed_hash << std::endl;
